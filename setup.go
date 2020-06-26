@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import (
 
 const (
 	closureCompilerVersion = "20170409"
+	closureLibraryVersion  = "v" + closureCompilerVersion
 	closureCompilerZip     = "compiler-" + closureCompilerVersion + ".zip"
 	closureCompilerJar     = "closure-compiler-v" + closureCompilerVersion + ".jar"
 	closureCompilerURL     = "http://dl.google.com/closure-compiler/" + closureCompilerZip
@@ -113,6 +114,10 @@ func main() {
 	if _, err := os.Stat(closureLibraryDir); os.IsNotExist(err) {
 		fmt.Println("\nDownloading Closure library...")
 		runCommand("git", "clone", "https://github.com/google/closure-library", closureLibraryDir)
+		// Make sure the libbrary and compiler versions are the same
+		os.Chdir(closureLibraryDir)
+		runCommand("git", "reset", "--hard", closureLibraryVersion)
+		os.Chdir(wd)
 	}
 
 	_, errD := os.Stat(closureCompilerDir)
