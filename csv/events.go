@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/battery-historian/checkinutil"
-	"github.com/google/battery-historian/historianutils"
+	"github.com/google/sensor-historian/checkinutil"
+	"github.com/google/sensor-historian/historianutils"
 )
 
 // sortByStartTime sorts events in ascending order of startTimeMs.

@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,12 +26,12 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/battery-historian/aggregated"
-	"github.com/google/battery-historian/bugreportutils"
-	"github.com/google/battery-historian/historianutils"
-	"github.com/google/battery-historian/parseutils"
-	bspb "github.com/google/battery-historian/pb/batterystats_proto"
-	"github.com/google/battery-historian/wakeupreason"
+	"github.com/google/sensor-historian/aggregated"
+	"github.com/google/sensor-historian/bugreportutils"
+	"github.com/google/sensor-historian/historianutils"
+	"github.com/google/sensor-historian/parseutils"
+	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
+	"github.com/google/sensor-historian/wakeupreason"
 )
 
 func abs(x float32) float32 {
@@ -48,14 +48,14 @@ func absInt32(x int32) int32 {
 	return x
 }
 
-// userActivity contains a processed form of the UserActivity proto found in github.com/google/battery-historian/pb/batterystats.proto.
+// userActivity contains a processed form of the UserActivity proto found in github.com/google/sensor-historian/pb/batterystats.proto.
 type userActivity struct {
 	Type  string
 	Count float32
 }
 
 // AppStat contains the parsed app data from a bugreport.
-// This contains the raw App proto in github.com/google/battery-historian/pb/batterystats.proto
+// This contains the raw App proto in github.com/google/sensor-historian/pb/batterystats.proto
 // but includes some custom fields that need to be processed before conversion to JS.
 type AppStat struct {
 	DevicePowerPrediction float32

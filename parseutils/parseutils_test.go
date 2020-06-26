@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/battery-historian/csv"
+	"github.com/google/sensor-historian/csv"
 
-	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
+	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
 )
 
 var emptyUIDPackageMapping = PackageUIDMapping{}
@@ -2942,7 +2942,7 @@ func TestInstantAppEventParsing(t *testing.T) {
 				`9,hsp,4,10139,"com.google.android.apps.interactiveevents"`,
 				`9,hsp,6,1234,"com.google.android.apps.chromecast.app"`, // The "UID" section for Epi is actually just the version code of the app.
 				`9,hsp,7,81,"com.google.android.apps.blogger"`,          // The "UID" section for Epu is actually just the version code of the app.
-				`9,hsp,8,10070,""`,                                      // The log won't include the application name, just the UID.
+				`9,hsp,8,10070,""`, // The log won't include the application name, just the UID.
 				`9,h,0:RESET:TIME:1432964300000`,
 				`9,h,1000,Eaa=3`,
 				`9,h,2000,Eai=4`,

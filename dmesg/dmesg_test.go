@@ -1,4 +1,4 @@
-// Copyright 2017 Google LLC. All Rights Reserved.
+// Copyright 2017-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/battery-historian/csv"
+	"github.com/google/sensor-historian/csv"
 )
 
 // TestParse tests the generation of CSV entries from the kernel dmesg logs.

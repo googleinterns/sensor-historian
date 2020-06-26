@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/battery-historian/checkinparse"
-	bspb "github.com/google/battery-historian/pb/batterystats_proto"
+	"github.com/google/sensor-historian/checkinparse"
+	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
 )
 
 // roundToTwoDecimal rounds off floats to 2 decimal places.

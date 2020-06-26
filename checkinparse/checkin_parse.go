@@ -27,15 +27,15 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/battery-historian/build"
-	"github.com/google/battery-historian/checkinutil"
-	"github.com/google/battery-historian/historianutils"
-	"github.com/google/battery-historian/packageutils"
-	"github.com/google/battery-historian/sliceparse"
+	"github.com/google/sensor-historian/build"
+	"github.com/google/sensor-historian/checkinutil"
+	"github.com/google/sensor-historian/historianutils"
+	"github.com/google/sensor-historian/packageutils"
+	"github.com/google/sensor-historian/sliceparse"
 
-	bspb "github.com/google/battery-historian/pb/batterystats_proto"
-	sessionpb "github.com/google/battery-historian/pb/session_proto"
-	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
+	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
+	sessionpb "github.com/google/sensor-historian/pb/session_proto"
+	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
 )
 
 const (
