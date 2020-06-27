@@ -16,7 +16,9 @@
 // Protocol buffer containing information about installed packages.
 
 syntax = "proto2";
+
 package usagestats;
+
 option go_package = "github.com/googleinterns/sensor-historian/pb/usagestats_proto;usagestats";
 
 message PackageInfo {

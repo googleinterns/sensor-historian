@@ -18,6 +18,7 @@
 syntax = "proto2";
 
 package metrics;
+
 option go_package = "github.com/googleinterns/sensor-historian/pb/metrics_proto;metrics";
 
 message MetricsEvent {

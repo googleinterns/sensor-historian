@@ -19,7 +19,9 @@
 syntax = "proto2";
 
 package batterystats;
+
 option go_package = "github.com/googleinterns/sensor-historian/pb/batterystats_proto;batterystats";
+
 import "github.com/googleinterns/sensor-historian/pb/build_proto/build.proto";
 
 message BatteryStats {

@@ -14,9 +14,9 @@
 
 syntax = "proto2";
 
-option go_package="github.com/googleinterns/sensor-historian/pb/build_proto";
-
 package build;
+
+option go_package="github.com/googleinterns/sensor-historian/pb/build_proto";
 
 message Build {
 

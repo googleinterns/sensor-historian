@@ -18,6 +18,7 @@
 syntax = "proto2";
 
 package usagestats;
+
 option go_package = "github.com/googleinterns/sensor-historian/pb/usagestats_proto;usagestats";
 
 import "github.com/googleinterns/sensor-historian/pb/usagestats_proto/android_package_info.proto";
