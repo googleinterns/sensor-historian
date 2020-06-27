@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/csv"
 )
 
 // Tests the generating of CSV entries from a Kernel Wakesource logging file.

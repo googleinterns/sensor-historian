@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/bugreportutils"
-	"github.com/google/sensor-historian/checkinparse"
-	"github.com/google/sensor-historian/historianutils"
-	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
 )
 
 const (

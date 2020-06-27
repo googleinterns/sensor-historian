@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/sensor-historian/historianutils"
-	"github.com/google/sensor-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/packageutils"
 )
 
 const (

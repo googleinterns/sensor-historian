@@ -30,12 +30,12 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/bugreportutils"
-	"github.com/google/sensor-historian/checkindelta"
-	"github.com/google/sensor-historian/checkinparse"
-	"github.com/google/sensor-historian/checkinutil"
-	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
-	sessionpb "github.com/google/sensor-historian/pb/session_proto"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/checkindelta"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/checkinutil"
+	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
+	sessionpb "github.com/googleinterns/sensor-historian/pb/session_proto"
 )
 
 var (

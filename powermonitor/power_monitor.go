@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/sensor-historian/csv"
-	"github.com/google/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/historianutils"
 )
 
 const (

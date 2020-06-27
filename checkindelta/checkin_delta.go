@@ -24,11 +24,11 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/checkinparse"
-	"github.com/google/sensor-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/packageutils"
 
-	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
-	bldpb "github.com/google/sensor-historian/pb/build_proto"
+	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
+	bldpb "github.com/googleinterns/sensor-historian/pb/build_proto"
 )
 
 const (

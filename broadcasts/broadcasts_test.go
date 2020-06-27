@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/csv"
 )
 
 // TestParse tests the generation of CSV entries for broadcast events.

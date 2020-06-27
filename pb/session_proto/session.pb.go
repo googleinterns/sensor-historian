@@ -20,9 +20,9 @@ import (
 
 	math "math"
 
-	usagestats1 "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagestats1 "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 
-	usagestats "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagestats "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

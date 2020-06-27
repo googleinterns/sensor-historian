@@ -30,12 +30,12 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/checkinparse"
-	"github.com/google/sensor-historian/csv"
-	"github.com/google/sensor-historian/historianutils"
-	"github.com/google/sensor-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/packageutils"
 
-	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 // These constants should be kept consistent with BatteryStats.java.

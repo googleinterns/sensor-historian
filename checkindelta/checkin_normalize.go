@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/checkinparse"
-	bspb "github.com/google/sensor-historian/pb/batterystats_proto"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
 )
 
 // roundToTwoDecimal rounds off floats to 2 decimal places.

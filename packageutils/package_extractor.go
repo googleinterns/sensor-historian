@@ -24,9 +24,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/historianutils"
 
-	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 // Time format that firstInstallTime and lastUpdateTime are in, using the constants defined in the Golang time package
@@ -178,7 +178,7 @@ Loop:
 			}
 			vc, err := strconv.Atoi(result["versionCode"])
 			if err != nil {
-				errs = append(errs, fmt.Errorf("error getting version code from string: %v\n", err))
+				errs = append(errs, fmt.Errorf("error getting version code from string: %v", err))
 				continue
 			}
 			curPkg.VersionCode = proto.Int32(int32(vc))

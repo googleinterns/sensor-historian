@@ -25,12 +25,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/sensor-historian/bugreportutils"
-	"github.com/google/sensor-historian/csv"
-	"github.com/google/sensor-historian/historianutils"
-	"github.com/google/sensor-historian/packageutils"
-	metricspb "github.com/google/sensor-historian/pb/metrics_proto"
-	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/packageutils"
+	metricspb "github.com/googleinterns/sensor-historian/pb/metrics_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 var (

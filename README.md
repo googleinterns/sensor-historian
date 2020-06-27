@@ -41,13 +41,13 @@ Next, install Java from <http://www.oracle.com/technetwork/java/javase/downloads
 Next, download the Battery Historian code and its dependencies:
 
 ```
-$ go get -d -u github.com/google/sensor-historian/...
+$ go get -d -u github.com/googleinterns/sensor-historian/...
 ```
 
 Finally, run Battery Historian!
 
 ```
-$ cd $GOPATH/src/github.com/google/sensor-historian
+$ cd $GOPATH/src/github.com/googleinterns/sensor-historian
 
 # Compile Javascript files using the Closure compiler
 $ go run setup.go
@@ -56,10 +56,10 @@ $ go run setup.go
 $ go run cmd/sensor-historian/sensor-historian.go [--port <default:9999>]
 ```
 
-Remember, you must always run sensor-historian from inside the `$GOPATH/src/github.com/google/sensor-historian` directory:
+Remember, you must always run sensor-historian from inside the `$GOPATH/src/github.com/googleinterns/sensor-historian` directory:
 
 ```
-cd $GOPATH/src/github.com/google/sensor-historian
+cd $GOPATH/src/github.com/googleinterns/sensor-historian
 go run cmd/sensor-historian/sensor-historian.go [--port <default:9999>]
 ```
 

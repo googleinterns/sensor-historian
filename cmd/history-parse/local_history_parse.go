@@ -23,9 +23,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/sensor-historian/bugreportutils"
-	"github.com/google/sensor-historian/packageutils"
-	"github.com/google/sensor-historian/parseutils"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/parseutils"
 )
 
 var (

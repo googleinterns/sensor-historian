@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/historianutils"
 
-	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 const (

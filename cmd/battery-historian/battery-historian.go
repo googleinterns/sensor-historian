@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"path"
 
-	"github.com/google/sensor-historian/analyzer"
+	"github.com/googleinterns/sensor-historian/analyzer"
 )
 
 var (

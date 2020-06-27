@@ -20,7 +20,7 @@ import (
 
 	math "math"
 
-	build "github.com/google/sensor-historian/pb/build_proto"
+	build "github.com/googleinterns/sensor-historian/pb/build_proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

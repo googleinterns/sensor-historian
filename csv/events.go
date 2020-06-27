@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/sensor-historian/checkinutil"
-	"github.com/google/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/checkinutil"
+	"github.com/googleinterns/sensor-historian/historianutils"
 )
 
 // sortByStartTime sorts events in ascending order of startTimeMs.

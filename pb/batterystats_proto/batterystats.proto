@@ -19,8 +19,8 @@
 syntax = "proto2";
 
 package batterystats;
-
-import "github.com/google/sensor-historian/pb/build_proto/build.proto";
+option go_package = "github.com/googleinterns/sensor-historian/pb/batterystats_proto;batterystats";
+import "github.com/googleinterns/sensor-historian/pb/build_proto/build.proto";
 
 message BatteryStats {
   // Unique ID for the record. Concatenation of end_time_usec, shard, and the index in the shard.

@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/csv"
 
-	usagepb "github.com/google/sensor-historian/pb/usagestats_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 var emptyUIDPackageMapping = PackageUIDMapping{}

@@ -17,9 +17,11 @@
 #
 
 # To regenerate the compiled Go files if the protos are modified.
-cd $GOPATH/src
-protoc --go_out=. github.com/google/sensor-historian/pb/batterystats_proto/*.proto
-protoc --go_out=. github.com/google/sensor-historian/pb/build_proto/*.proto
-protoc --go_out=. github.com/google/sensor-historian/pb/metrics_proto/*.proto
-protoc --go_out=. github.com/google/sensor-historian/pb/session_proto/*.proto
-protoc --go_out=. github.com/google/sensor-historian/pb/usagestats_proto/*.proto
+cd $GOPATH/src/
+
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/build_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/usagestats_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/session_proto/*.proto
+

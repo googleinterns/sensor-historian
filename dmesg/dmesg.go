@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/sensor-historian/bugreportutils"
-	"github.com/google/sensor-historian/csv"
-	"github.com/google/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/historianutils"
 )
 
 var (
