@@ -24,4 +24,3 @@ protoc --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_prot
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/usagestats_proto/*.proto
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/session_proto/*.proto
-
