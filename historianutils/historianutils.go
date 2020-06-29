@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,9 @@ import (
 var (
 	// ServiceDumpRE is a regular expression to match the beginning of a service dump.
 	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>\S+):`)
+
+	// ServiceDumpWithTagRE is a regular expression to match the beginning of a service dump with tag.
+	ServiceDumpWithTagRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<serviceTag>\S+)\s+(?P<service>\S+):`)
 
 	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.
 	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
