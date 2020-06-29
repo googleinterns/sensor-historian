@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,12 +30,12 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/battery-historian/checkinparse"
-	"github.com/google/battery-historian/csv"
-	"github.com/google/battery-historian/historianutils"
-	"github.com/google/battery-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/csv"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/packageutils"
 
-	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 // These constants should be kept consistent with BatteryStats.java.

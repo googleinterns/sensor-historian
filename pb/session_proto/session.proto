@@ -1,4 +1,4 @@
-// Copyright 2015 Google LLC. All Rights Reserved.
+// Copyright 2015-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +20,11 @@ syntax = "proto2";
 
 package session;
 
-import "github.com/google/battery-historian/pb/usagestats_proto/android_battery_usage.proto";
-import "github.com/google/battery-historian/pb/usagestats_proto/android_package_info.proto";
+option go_package = "github.com/googleinterns/sensor-historian/pb/session_proto;session";
+
+import "github.com/googleinterns/sensor-historian/pb/usagestats_proto/android_battery_usage.proto";
+
+import "github.com/googleinterns/sensor-historian/pb/usagestats_proto/android_package_info.proto";
 
 // Aggregated checkin stats that we will use to compute deltas.
 message Checkin {

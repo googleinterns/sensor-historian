@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,24 +34,24 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/google/battery-historian/activity"
-	"github.com/google/battery-historian/broadcasts"
-	"github.com/google/battery-historian/bugreportutils"
-	"github.com/google/battery-historian/checkindelta"
-	"github.com/google/battery-historian/checkinparse"
-	"github.com/google/battery-historian/checkinutil"
-	"github.com/google/battery-historian/dmesg"
-	"github.com/google/battery-historian/historianutils"
-	"github.com/google/battery-historian/kernel"
-	"github.com/google/battery-historian/packageutils"
-	"github.com/google/battery-historian/parseutils"
-	"github.com/google/battery-historian/powermonitor"
-	"github.com/google/battery-historian/presenter"
-	"github.com/google/battery-historian/wearable"
+	"github.com/googleinterns/sensor-historian/activity"
+	"github.com/googleinterns/sensor-historian/broadcasts"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/checkindelta"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/checkinutil"
+	"github.com/googleinterns/sensor-historian/dmesg"
+	"github.com/googleinterns/sensor-historian/historianutils"
+	"github.com/googleinterns/sensor-historian/kernel"
+	"github.com/googleinterns/sensor-historian/packageutils"
+	"github.com/googleinterns/sensor-historian/parseutils"
+	"github.com/googleinterns/sensor-historian/powermonitor"
+	"github.com/googleinterns/sensor-historian/presenter"
+	"github.com/googleinterns/sensor-historian/wearable"
 
-	bspb "github.com/google/battery-historian/pb/batterystats_proto"
-	sessionpb "github.com/google/battery-historian/pb/session_proto"
-	usagepb "github.com/google/battery-historian/pb/usagestats_proto"
+	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
+	sessionpb "github.com/googleinterns/sensor-historian/pb/session_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 const (

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# Copyright 2015 Google LLC. All Rights Reserved.
+# Copyright 2015-2020 Google LLC. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 #
 
 # To regenerate the compiled Go files if the protos are modified.
-cd $GOPATH/src
-protoc --go_out=. github.com/google/battery-historian/pb/batterystats_proto/*.proto
-protoc --go_out=. github.com/google/battery-historian/pb/build_proto/*.proto
-protoc --go_out=. github.com/google/battery-historian/pb/metrics_proto/*.proto
-protoc --go_out=. github.com/google/battery-historian/pb/session_proto/*.proto
-protoc --go_out=. github.com/google/battery-historian/pb/usagestats_proto/*.proto
+cd $GOPATH/src/
+
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/build_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/usagestats_proto/*.proto
+protoc --go_out=. github.com/googleinterns/sensor-historian/pb/session_proto/*.proto

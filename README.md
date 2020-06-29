@@ -1,36 +1,14 @@
+# Sensor Historian
+This is not an officially supported Google product.
+
+
+All the following information are adopted from the Battery Historian repo. The Sensor Historian tool will have a new README.md file later.
+
 # Battery Historian
 
 Battery Historian is a tool to inspect battery related information and events on an Android device running Android 5.0 Lollipop (API level 21) and later, while the device was not plugged in. It allows application developers to visualize system and application level events on a timeline with panning and zooming functionality, easily see various aggregated statistics since the device was last fully charged, and select an application and inspect the metrics that impact battery specific to the chosen application. It also allows an A/B comparison of two bugreports, highlighting differences in key battery related metrics.
 
 ## Getting Started
-
-#### Using Docker
-
-Install [Docker](<https://docs.docker.com/engine/installation/>).
-
-Run the Battery Historian image. Choose a port number and replace `<port>` with
-that number in the commands below:
-
-```
-docker run -p <port>:9999 gcr.io/android-battery-historian/stable:3.0 --port 9999
-```
-
-For Linux and Mac OS X:
-
-* That's it, you're done! Historian will be available at
-  `http://localhost:<port>`.
-
-For Windows:
-
-* You may have to [enable Virtualization in your
-  BIOS](<http://www.itworld.com/article/2981515/virtualization/virtualbox-diagnose-and-fix-vt-xamd-v-hardware-acceleration-errors.html>).
-
-* Once you start Docker, it should tell you the IP address of the machine it is
-using. If, for example, the IP address is 123.456.78.90, Historian will be
-available at `http://123.456.78.90:<port>`.
-
-For more information about the port forwarding, see the [Docker
-documentation](<https://docs.docker.com/engine/reference/run/#/expose-incoming-ports>).
 
 #### Building from source code
 
@@ -63,26 +41,26 @@ Next, install Java from <http://www.oracle.com/technetwork/java/javase/downloads
 Next, download the Battery Historian code and its dependencies:
 
 ```
-$ go get -d -u github.com/google/battery-historian/...
+$ go get -d -u github.com/googleinterns/sensor-historian/...
 ```
 
 Finally, run Battery Historian!
 
 ```
-$ cd $GOPATH/src/github.com/google/battery-historian
+$ cd $GOPATH/src/github.com/googleinterns/sensor-historian
 
 # Compile Javascript files using the Closure compiler
 $ go run setup.go
 
 # Run Historian on your machine (make sure $PATH contains $GOBIN)
-$ go run cmd/battery-historian/battery-historian.go [--port <default:9999>]
+$ go run cmd/sensor-historian/sensor-historian.go [--port <default:9999>]
 ```
 
-Remember, you must always run battery-historian from inside the `$GOPATH/src/github.com/google/battery-historian` directory:
+Remember, you must always run sensor-historian from inside the `$GOPATH/src/github.com/googleinterns/sensor-historian` directory:
 
 ```
-cd $GOPATH/src/github.com/google/battery-historian
-go run cmd/battery-historian/battery-historian.go [--port <default:9999>]
+cd $GOPATH/src/github.com/googleinterns/sensor-historian
+go run cmd/sensor-historian/sensor-historian.go [--port <default:9999>]
 ```
 
 
@@ -264,11 +242,3 @@ $ go run cmd/history-parse/local_history_parse.go --summary=totalTime --input=bu
 # Diff two bug reports
 $ go run cmd/checkin-delta/local_checkin_delta.go --input=bugreport_1.txt,bugreport_2.txt
 ```
-
-
-## Support
-
-- G+ Community (Discussion Thread: Battery Historian): https://plus.google.com/b/108967384991768947849/communities/114791428968349268860
-
-If you've found an error in this project, please file an issue:
-<https://github.com/google/battery-historian/issues>

@@ -13,10 +13,15 @@ It has these top-level messages:
 */
 package batterystats
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
-import build "github.com/google/battery-historian/pb/build_proto"
+import (
+	fmt "fmt"
+
+	proto "github.com/golang/protobuf/proto"
+
+	math "math"
+
+	build "github.com/googleinterns/sensor-historian/pb/build_proto"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal

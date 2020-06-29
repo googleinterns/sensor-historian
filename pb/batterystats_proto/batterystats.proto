@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@ syntax = "proto2";
 
 package batterystats;
 
-import "github.com/google/battery-historian/pb/build_proto/build.proto";
+option go_package = "github.com/googleinterns/sensor-historian/pb/batterystats_proto;batterystats";
+
+import "github.com/googleinterns/sensor-historian/pb/build_proto/build.proto";
 
 message BatteryStats {
   // Unique ID for the record. Concatenation of end_time_usec, shard, and the index in the shard.

@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,11 +28,11 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/battery-historian/bugreportutils"
-	"github.com/google/battery-historian/checkinparse"
-	"github.com/google/battery-historian/checkinutil"
-	"github.com/google/battery-historian/packageutils"
-	sessionpb "github.com/google/battery-historian/pb/session_proto"
+	"github.com/googleinterns/sensor-historian/bugreportutils"
+	"github.com/googleinterns/sensor-historian/checkinparse"
+	"github.com/googleinterns/sensor-historian/checkinutil"
+	"github.com/googleinterns/sensor-historian/packageutils"
+	sessionpb "github.com/googleinterns/sensor-historian/pb/session_proto"
 )
 
 var (
