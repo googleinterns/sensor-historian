@@ -61,7 +61,7 @@ type AppStat struct {
 	DevicePowerPrediction float32
 	CPUPowerPrediction    float32 // Device estimated power use due to CPU usage.
 	RawStats              *bspb.BatteryStats_App
-	Sensor                []*bugreportutils.SensorInfo
+	Sensor                []bugreportutils.SensorInfo
 	UserActivity          []userActivity
 }
 
@@ -248,7 +248,7 @@ func (a byName) Len() int           { return len(a) }
 func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byName) Less(i, j int) bool { return a[i].RawStats.GetName() < a[j].RawStats.GetName() }
 
-func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]*bugreportutils.SensorInfo) []AppStat {
+func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]bugreportutils.SensorInfo) []AppStat {
 	var as []AppStat
 	bCapMah := checkin.GetSystem().GetPowerUseSummary().GetBatteryCapacityMah()
 
@@ -279,7 +279,7 @@ func parseAppStats(checkin *bspb.BatteryStats, sensors map[int32]*bugreportutils
 		for _, s := range app.GetSensor() {
 			sensor, ok := sensors[s.GetNumber()]
 			if !ok {
-				sensor = &bugreportutils.SensorInfo{
+				sensor = bugreportutils.SensorInfo{
 					Name:   fmt.Sprintf("unknown sensor (#%d)", s.GetNumber()),
 					Number: s.GetNumber(),
 				}

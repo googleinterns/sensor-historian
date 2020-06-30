@@ -207,7 +207,7 @@ func TestParseMetaInfo(t *testing.T) {
 				SdkVersion:       21,
 				ModelName:        "Nexus 5",
 				BuildFingerprint: `google/hammerhead/hammerhead:5.0.1/LRX22C/1602158:user/release-keys`,
-				Sensors: map[int32]*SensorInfo{
+				Sensors: map[int32]SensorInfo{
 					-10000: {
 						Name:   `GPS`,
 						Number: -10000,
@@ -300,7 +300,7 @@ func TestParseMetaInfo(t *testing.T) {
 				SdkVersion:       21,
 				ModelName:        "Nexus 6",
 				BuildFingerprint: `google/hammerhead/hammerhead:5.0.1/LRX22C/1602158:user/release-keys`,
-				Sensors: map[int32]*SensorInfo{
+				Sensors: map[int32]SensorInfo{
 					-10000: {Name: `GPS`, Number: -10000},
 				},
 			},
@@ -332,7 +332,7 @@ func TestParseMetaInfo(t *testing.T) {
 				SdkVersion:       23,
 				ModelName:        "Nexus 6",
 				BuildFingerprint: `google/shamu/shamu:6.0/MRA58E/2219288:userdebug/dev-keys`,
-				Sensors: map[int32]*SensorInfo{
+				Sensors: map[int32]SensorInfo{
 					-10000: {Name: `GPS`, Number: -10000},
 				},
 			},
@@ -369,7 +369,7 @@ func TestParseMetaInfo(t *testing.T) {
 				SdkVersion:       21,
 				ModelName:        "Nexus 5",
 				BuildFingerprint: `google/hammerhead/hammerhead:5.0.1/LRX22C/1602158:user/release-keys`,
-				Sensors: map[int32]*SensorInfo{
+				Sensors: map[int32]SensorInfo{
 					-10000: {
 						Name:   `GPS`,
 						Number: -10000,
@@ -418,7 +418,7 @@ func TestParseMetaInfo(t *testing.T) {
 				SdkVersion:       21,
 				ModelName:        "Nexus 5",
 				BuildFingerprint: `google/hammerhead/hammerhead:5.0.1/LRX22C/1602158:user/release-keys`,
-				Sensors: map[int32]*SensorInfo{
+				Sensors: map[int32]SensorInfo{
 					-10000: {
 						Name:   `GPS`,
 						Number: -10000,

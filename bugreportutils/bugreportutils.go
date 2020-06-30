@@ -144,7 +144,7 @@ type MetaInfo struct {
 	SdkVersion       int
 	BuildFingerprint string
 	ModelName        string
-	Sensors          map[int32]*SensorInfo
+	Sensors          map[int32]SensorInfo
 }
 
 // SensorInfo contains basic information about a device's sensor.
@@ -206,9 +206,9 @@ func ParseMetaInfo(input string) (*MetaInfo, error) {
 }
 
 // extractSensorInfo extracts device sensor information found in the sensorservice dump of a bug report.
-func extractSensorInfo(input string) (map[int32]*SensorInfo, error) {
+func extractSensorInfo(input string) (map[int32]SensorInfo, error) {
 	inSSection := false
-	sensors := make(map[int32]*SensorInfo)
+	sensors := make(map[int32]SensorInfo)
 	curNum := int32(-1)
 
 Loop:
@@ -243,22 +243,25 @@ Loop:
 			}
 
 			if _, ok := sensors[curNum]; !ok {
-				sensors[int32(n)] = &SensorInfo{}
+				sensors[int32(n)] = SensorInfo{}
 			}
-			sensors[curNum].Name = result["sensorName"]
-			sensors[curNum].Number = curNum
-			sensors[curNum].Type = result["sensorTypeString"]
-			sensors[curNum].Version = int32(v)
+			curSensor := sensors[curNum]
+			curSensor.Name = result["sensorName"]
+			curSensor.Number = curNum
+			curSensor.Type = result["sensorTypeString"]
+			curSensor.Version = int32(v)
+			sensors[curNum] = curSensor
 		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
-			sensors[curNum].RequestMode = result["requestMode"]
-			sensors[curNum].Var1 = result["variableOne"]
-			sensors[curNum].Var2 = result["variableTwo"]
+			curSensor := sensors[curNum]
+			curSensor.RequestMode = result["requestMode"]
+			curSensor.Var1 = result["variableOne"]
+			curSensor.Var2 = result["variableTwo"]
 
 			wakeup := false
 			if x := result["wakeUp"]; x != "non-wakeUp" {
 				wakeup = true
 			}
-			sensors[curNum].WakeUp = wakeup
+			curSensor.WakeUp = wakeup
 
 			if x := result["batching"]; x != "no batching" {
 				m, batchingInfo := historianutils.SubexpNames(BatchingDataRE, x)
@@ -273,16 +276,17 @@ Loop:
 				if err != nil {
 					return nil, err
 				}
-				sensors[curNum].Batch = true
-				sensors[curNum].Max = int32(max)
-				sensors[curNum].Reserved = int32(reserved)
+				curSensor.Batch = true
+				curSensor.Max = int32(max)
+				curSensor.Reserved = int32(reserved)
 			}
+			sensors[curNum] = curSensor
 		} else {
 			continue
 		}
 	}
 
-	sensors[GPSSensorNumber] = &SensorInfo{
+	sensors[GPSSensorNumber] = SensorInfo{
 		Name:   "GPS",
 		Number: GPSSensorNumber,
 	}
