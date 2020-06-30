@@ -29,6 +29,9 @@ import (
 
 var (
 	// ServiceDumpRE is a regular expression to match the beginning of a service dump.
+	// Note that the string obatined by service may also include tags like CRITICAL or HIGH.
+	// It is recommended to do substring check in order to match the desired service, rather than
+	// use direct string comparison.
 	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>.*):`)
 
 	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.

@@ -61,6 +61,15 @@ var (
 	pidRE = regexp.MustCompile(`PID #` + `(?P<pid>\d+)` + `: ProcessRecord[^:]+:` +
 		`(?P<app>[^/]+)` + `/` + `(?P<uid>.*)` + `}`)
 
+	// sensorLineMMinusRE is a regular expression to match the sensor list line in the
+	// sensorservice dump of a bug report from MNC or before.
+	sensorLineMMinusRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` +
+		`(?P<sensorManufacturer>[^|]+)` + `\|` + `(\s*version=(?P<versionNumber>\d+)\s*\|)?` +
+		`\s*(?P<sensorTypeString>[^|]+)` + `\|` + `\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)\s*` + `\|` +
+		`.*` + `\|` + `\s*type=\d+\s*\|` + `\s*(?P<requestMode>[^|]+)` + `\s*\|` +
+		`(?P<variableOne>[^|]+)` + `\s*\|` + `(?P<variableTwo>[^|]+)` + `\s*\|` +
+		`(?P<batching>[^|]+)` + `\s*\|` + `(?P<wakeUp>[^|]+)`)
+
 	// sensorLineOneRE is a regular expression to match the first line of sensor information
 	// from the sensor list line in the sensorservice dump in the bugreport starting
 	// from NRD42 and onwards.
@@ -82,6 +91,10 @@ var (
 	// e.g FIFO (max,reserved) = (10000, 3000) events
 	BatchingDataRE = regexp.MustCompile(`FIFO\s*\(max,reserved\)\s*=\s*\(` + `(?P<maxNum>\d+)` +
 		`,` + `(?P<reservedNum>[^|]+)` + `\) events\s*`)
+
+	rateRE    = regexp.MustCompile(`=(?P<rateVal>[\-\+]?[0-9]*(\.[0-9]+)+)Hz`)
+	delayRE   = regexp.MustCompile(`=(?P<delayVal>[\-\+]?\d+)us`)
+	fifoMaxRE = regexp.MustCompile(`FifoMax=` + `(?P<maxNum>[^|]+)` + `\s*events`)
 
 	// TimeZoneRE is a regular expression to match the timezone string in a bug report.
 	TimeZoneRE = regexp.MustCompile(`^\[persist.sys.timezone\]:\s+\[` + `(?P<timezone>\S+)\]`)
@@ -149,15 +162,16 @@ type MetaInfo struct {
 
 // SensorInfo contains basic information about a device's sensor.
 type SensorInfo struct {
-	Name, Type      string
-	Version, Number int32
-	TotalTimeMs     int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
-	Count           float32
-	RequestMode     string
-	Var1, Var2      string
-	Batch           bool
-	Max, Reserved   int32
-	WakeUp          bool
+	Name, Type         string
+	Version, Number    int32
+	TotalTimeMs        int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
+	Count              float32
+	RequestMode        string
+	MinRate, MaxRate   float32
+	MaxDelay, MinDelay int32
+	Batch              bool
+	Max, Reserved      int32
+	WakeUp             bool
 }
 
 // ParseMetaInfo extracts the device ID, build fingerprint and model name from the bug report.
@@ -228,8 +242,78 @@ Loop:
 		if !inSSection {
 			continue
 		}
+		// Each sensor's information is captured by one line from MNC or before.
+		if m, result := historianutils.SubexpNames(sensorLineMMinusRE, line); m {
+			curSensor := SensorInfo{}
+			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+			if err != nil {
+				return nil, err
+			}
+			curSensor.Number = int32(n)
+			v, err := strconv.Atoi(result["versionNumber"])
+			if err != nil {
+				return nil, err
+			}
+			curSensor.Version = int32(v)
+			if strings.Contains(result["variableOne"], "minRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinRate = float32(rate)
+				}
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxRate = float32(rate)
+				}
+			}
+			if strings.Contains(result["variableOne"], "maxDelay") {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = int32(delay)
+				}
+				fmt.Println(result["variableTwo"])
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
+					fmt.Println(delayValResult["delayVal"])
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = int32(delay)
+				}
+			}
 
-		// Each sensor's information needs at least two lines to record.
+			wakeup := false
+			if x := result["wakeUp"]; x != "non-wakeUp" {
+				wakeup = true
+			}
+			curSensor.WakeUp = wakeup
+			curSensor.Batch = false
+			if x := result["batching"]; x != "no batching" {
+				m, batchingInfo := historianutils.SubexpNames(fifoMaxRE, x)
+				if !m {
+					continue
+				}
+				max, err := strconv.Atoi(batchingInfo["maxNum"])
+				if err != nil {
+					return nil, err
+				}
+				curSensor.Max = int32(max)
+				curSensor.Batch = true
+			}
+			curSensor.Name = result["sensorName"]
+			curSensor.Type = result["sensorTypeString"]
+			curSensor.RequestMode = result["requestMode"]
+			sensors[int32(n)] = curSensor
+		}
+		// Each sensor's information needs at least two lines to record from NRD42 and onwards.
 		if inLineOne, result := historianutils.SubexpNames(sensorLineOneRE, line); inLineOne {
 			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
@@ -254,8 +338,39 @@ Loop:
 		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
 			curSensor := sensors[curNum]
 			curSensor.RequestMode = result["requestMode"]
-			curSensor.Var1 = result["variableOne"]
-			curSensor.Var2 = result["variableTwo"]
+
+			if strings.Contains(result["variableOne"], "minRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinRate = float32(rate)
+				}
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxRate = float32(rate)
+				}
+			}
+			if strings.Contains(result["variableOne"], "maxDelay") {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = int32(delay)
+				}
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = int32(delay)
+				}
+			}
 
 			wakeup := false
 			if x := result["wakeUp"]; x != "non-wakeUp" {
