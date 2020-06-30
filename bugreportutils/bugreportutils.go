@@ -64,7 +64,7 @@ var (
 	// sensorLineOneRE is a regular expression to match the first line of sensor information
 	// from the sensor list line in the sensorservice dump in the bugreport starting
 	// from NRD42 and onwards.
-	sensorLineOneRE = regexp.MustCompile(`(?P<sensorHandle>0x?[0-9A-Fa-f]+)` + `\)\s*` +
+	sensorLineOneRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\)\s*` +
 		`(?P<sensorName>[^|]+)` + `\s*\|` + `(?P<sensorManufacturer>[^|]+)` + `\|\s*ver:\s*` +
 		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` +
 		`\(\d+\)\s*\|` + `\s*perm:\s*` + `(?P<sensorPerm>[^|]+)` + `\s*\|\s*flags:\s*` +
@@ -149,17 +149,15 @@ type MetaInfo struct {
 
 // SensorInfo contains basic information about a device's sensor.
 type SensorInfo struct {
-	Number        int32
-	Name          string
-	Version       int32
-	Type          string
-	RequestMode   string
-	Var1, Var2    string
-	Batch         bool
-	Max, Reserved int32
-	WakeUp        bool
-	TotalTimeMs   int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
-	Count         float32
+	Name, Type      string
+	Version, Number int32
+	TotalTimeMs     int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
+	Count           float32
+	RequestMode     string
+	Var1, Var2      string
+	Batch           bool
+	Max, Reserved   int32
+	WakeUp          bool
 }
 
 // ParseMetaInfo extracts the device ID, build fingerprint and model name from the bug report.
@@ -211,14 +209,13 @@ func ParseMetaInfo(input string) (*MetaInfo, error) {
 func extractSensorInfo(input string) (map[int32]*SensorInfo, error) {
 	inSSection := false
 	sensors := make(map[int32]*SensorInfo)
-	curHandle := int32(-1)
+	curNum := int32(-1)
 
 Loop:
 	for _, line := range strings.Split(input, "\n") {
-		m1, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line)
-		m2, resultWithTag := historianutils.SubexpNames(historianutils.ServiceDumpWithTagRE, line)
-		if m1 || m2 {
-			switch in := (result["service"] == "sensorservice") || (resultWithTag["service"] == "sensorservice"); {
+		m, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line)
+		if m {
+			switch in := strings.Contains(result["service"], "sensorservice"); {
 			case inSSection && !in: // Just exited the section
 				break Loop
 			case in:
@@ -234,34 +231,34 @@ Loop:
 
 		// Each sensor's information needs at least two lines to record.
 		if inLineOne, result := historianutils.SubexpNames(sensorLineOneRE, line); inLineOne {
-			n, err := strconv.ParseInt(result["sensorHandle"], 0, 32)
+			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
 				return nil, err
 			}
-			curHandle = int32(n)
+			curNum = int32(n)
 
 			v, err := strconv.Atoi(result["versionNumber"])
 			if err != nil {
 				return nil, err
 			}
 
-			if _, ok := sensors[curHandle]; !ok {
+			if _, ok := sensors[curNum]; !ok {
 				sensors[int32(n)] = &SensorInfo{}
 			}
-			sensors[curHandle].Name = result["sensorName"]
-			sensors[curHandle].Number = curHandle
-			sensors[curHandle].Type = result["sensorTypeString"]
-			sensors[curHandle].Version = int32(v)
+			sensors[curNum].Name = result["sensorName"]
+			sensors[curNum].Number = curNum
+			sensors[curNum].Type = result["sensorTypeString"]
+			sensors[curNum].Version = int32(v)
 		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
-			sensors[curHandle].RequestMode = result["requestMode"]
-			sensors[curHandle].Var1 = result["variableOne"]
-			sensors[curHandle].Var2 = result["variableTwo"]
+			sensors[curNum].RequestMode = result["requestMode"]
+			sensors[curNum].Var1 = result["variableOne"]
+			sensors[curNum].Var2 = result["variableTwo"]
 
 			wakeup := false
 			if x := result["wakeUp"]; x != "non-wakeUp" {
 				wakeup = true
 			}
-			sensors[curHandle].WakeUp = wakeup
+			sensors[curNum].WakeUp = wakeup
 
 			if x := result["batching"]; x != "no batching" {
 				m, batchingInfo := historianutils.SubexpNames(BatchingDataRE, x)
@@ -276,9 +273,9 @@ Loop:
 				if err != nil {
 					return nil, err
 				}
-				sensors[curHandle].Batch = true
-				sensors[curHandle].Max = int32(max)
-				sensors[curHandle].Reserved = int32(reserved)
+				sensors[curNum].Batch = true
+				sensors[curNum].Max = int32(max)
+				sensors[curNum].Reserved = int32(reserved)
 			}
 		} else {
 			continue

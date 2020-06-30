@@ -391,7 +391,7 @@ func TestParseMetaInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "ParseMetaInfo (all entries with serviceTag)",
+			name: "ParseMetaInfo (all entries with CRITICAL sensorservice)",
 			input: strings.Join([]string{
 				`Build: LRX22C`,
 				`Build fingerprint: 'google/hammerhead/hammerhead:5.0.1/LRX22C/1602158:user/release-keys'`,

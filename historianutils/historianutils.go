@@ -29,10 +29,7 @@ import (
 
 var (
 	// ServiceDumpRE is a regular expression to match the beginning of a service dump.
-	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>\S+):`)
-
-	// ServiceDumpWithTagRE is a regular expression to match the beginning of a service dump with tag.
-	ServiceDumpWithTagRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<serviceTag>\S+)\s+(?P<service>\S+):`)
+	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>.*):`)
 
 	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.
 	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
@@ -45,7 +42,7 @@ var (
 // From:
 //     com.google.android.apps.plus.content.EsProvider/com.google/john.doe@gmail.com/extra
 //     or
-//     *sync*/com.app.android.conversations/com.app.android.account/Mr. Noogler
+//     *sync*/com.app.andrsoid.conversations/com.app.android.account/Mr. Noogler
 // To:
 //     com.google.android.apps.plus.content.EsProvider/com.google/XXX@gmail.com/extra
 //     or

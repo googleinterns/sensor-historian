@@ -48,14 +48,14 @@ func absInt32(x int32) int32 {
 	return x
 }
 
-// userActivity contains a processed form of the UserActivity proto found in github.com/google/sensor-historian/pb/batterystats.proto.
+// userActivity contains a processed form of the UserActivity proto found in github.com/googleinterns/sensor-historian/pb/batterystats.proto.
 type userActivity struct {
 	Type  string
 	Count float32
 }
 
 // AppStat contains the parsed app data from a bugreport.
-// This contains the raw App proto in github.com/google/sensor-historian/pb/batterystats.proto
+// This contains the raw App proto in github.com/googleinterns/sensor-historian/pb/batterystats.proto
 // but includes some custom fields that need to be processed before conversion to JS.
 type AppStat struct {
 	DevicePowerPrediction float32
