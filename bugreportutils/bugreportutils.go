@@ -166,7 +166,6 @@ type SensorInfo struct {
 	TotalTimeMs        int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
 	Count              float32
 	RequestMode        string
-	MinRate, MaxRate   float32
 	MaxDelay, MinDelay int32
 	Batch              bool
 	Max, Reserved      int32
@@ -243,6 +242,7 @@ Loop:
 		}
 		// Each sensor's information is captured by one line from MNC or before.
 		if m, result := historianutils.SubexpNames(sensorLineMMinusRE, line); m {
+			fmt.Println("old version")
 			curSensor := SensorInfo{}
 			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
@@ -254,23 +254,17 @@ Loop:
 				return nil, err
 			}
 			curSensor.Version = int32(v)
+
+			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
 			if strings.Contains(result["variableOne"], "minRate") {
 				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
 					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinRate = float32(rate)
+					curSensor.MaxDelay = historianutils.RoundFloat(float64(1000000) / rate)
 				}
-				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
-					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
-					if err != nil {
-						return nil, err
-					}
-					curSensor.MaxRate = float32(rate)
-				}
-			}
-			if strings.Contains(result["variableOne"], "maxDelay") {
+			} else {
 				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
 					delay, err := strconv.Atoi(delayValResult["delayVal"])
 					if err != nil {
@@ -278,9 +272,17 @@ Loop:
 					}
 					curSensor.MaxDelay = int32(delay)
 				}
-				fmt.Println(result["variableTwo"])
+			}
+			if strings.Contains(result["variableTwo"], "maxRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
 				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
-					fmt.Println(delayValResult["delayVal"])
 					delay, err := strconv.Atoi(delayValResult["delayVal"])
 					if err != nil {
 						return nil, err
@@ -311,20 +313,22 @@ Loop:
 			curSensor.Type = result["sensorTypeString"]
 			curSensor.RequestMode = result["requestMode"]
 			sensors[int32(n)] = curSensor
+			continue
 		}
+
 		// Each sensor's information needs at least two lines to record from NRD42 and onwards.
 		if inLineOne, result := historianutils.SubexpNames(sensorLineOneRE, line); inLineOne {
 			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
 				return nil, err
 			}
+			curNum = int32(n)
 			v, err := strconv.Atoi(result["versionNumber"])
 			if err != nil {
 				return nil, err
 			}
-
 			if _, ok := sensors[curNum]; !ok {
-				sensors[int32(n)] = SensorInfo{}
+				sensors[curNum] = SensorInfo{}
 			}
 			curSensor := sensors[curNum]
 			curSensor.Name = result["sensorName"]
@@ -335,24 +339,16 @@ Loop:
 		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
 			curSensor := sensors[curNum]
 			curSensor.RequestMode = result["requestMode"]
-
+			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
 			if strings.Contains(result["variableOne"], "minRate") {
 				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
 					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinRate = float32(rate)
+					curSensor.MaxDelay = historianutils.RoundFloat(float64(1000000) / rate)
 				}
-				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
-					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
-					if err != nil {
-						return nil, err
-					}
-					curSensor.MaxRate = float32(rate)
-				}
-			}
-			if strings.Contains(result["variableOne"], "maxDelay") {
+			} else {
 				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
 					delay, err := strconv.Atoi(delayValResult["delayVal"])
 					if err != nil {
@@ -360,6 +356,17 @@ Loop:
 					}
 					curSensor.MaxDelay = int32(delay)
 				}
+			}
+
+			if strings.Contains(result["variableTwo"], "maxRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
 				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
 					delay, err := strconv.Atoi(delayValResult["delayVal"])
 					if err != nil {
@@ -393,6 +400,7 @@ Loop:
 				curSensor.Reserved = int32(reserved)
 			}
 			sensors[curNum] = curSensor
+			curNum = int32(-1)
 		} else {
 			continue
 		}

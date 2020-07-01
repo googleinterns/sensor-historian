@@ -108,6 +108,14 @@ func MaxInt64(a int64, b int64) int64 {
 	return b
 }
 
+// RoundFloat returns the closest integer to the given float number.
+func RoundFloat(val float64) int32 {
+	if val < 0 {
+		return int32(val - 0.5)
+	}
+	return int32(val + 0.5)
+}
+
 // ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
 // This is the same as Golang's time.ParseDuration, but also handles days. Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
 func ParseDurationWithDays(input string) (int64, error) {
