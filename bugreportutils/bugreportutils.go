@@ -242,13 +242,13 @@ Loop:
 		}
 		// Each sensor's information is captured by one line from MNC or before.
 		if m, result := historianutils.SubexpNames(sensorLineMMinusRE, line); m {
-			fmt.Println("old version")
 			curSensor := SensorInfo{}
 			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
 				return nil, err
 			}
 			curSensor.Number = int32(n)
+
 			v, err := strconv.Atoi(result["versionNumber"])
 			if err != nil {
 				return nil, err
@@ -296,6 +296,7 @@ Loop:
 				wakeup = true
 			}
 			curSensor.WakeUp = wakeup
+
 			curSensor.Batch = false
 			if x := result["batching"]; x != "no batching" {
 				m, batchingInfo := historianutils.SubexpNames(fifoMaxRE, x)
@@ -309,6 +310,7 @@ Loop:
 				curSensor.Max = int32(max)
 				curSensor.Batch = true
 			}
+
 			curSensor.Name = result["sensorName"]
 			curSensor.Type = result["sensorTypeString"]
 			curSensor.RequestMode = result["requestMode"]
@@ -323,10 +325,12 @@ Loop:
 				return nil, err
 			}
 			curNum = int32(n)
+
 			v, err := strconv.Atoi(result["versionNumber"])
 			if err != nil {
 				return nil, err
 			}
+
 			if _, ok := sensors[curNum]; !ok {
 				sensors[curNum] = SensorInfo{}
 			}
@@ -339,6 +343,7 @@ Loop:
 		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
 			curSensor := sensors[curNum]
 			curSensor.RequestMode = result["requestMode"]
+
 			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
 			if strings.Contains(result["variableOne"], "minRate") {
 				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
@@ -357,7 +362,6 @@ Loop:
 					curSensor.MaxDelay = int32(delay)
 				}
 			}
-
 			if strings.Contains(result["variableTwo"], "maxRate") {
 				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
 					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
