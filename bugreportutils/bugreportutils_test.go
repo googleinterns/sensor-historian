@@ -271,6 +271,8 @@ func TestParseMetaInfo(t *testing.T) {
 				`DUMP OF SERVICE sensorservice:`,
 				`Sensor List:`,
 				// The spaces are actually found in bug reports.
+				`0000000000) CrosEC Compass            | Google          | ver: 1 | type: android.sensor.magnetic_field(2) | perm: n/a`,
+				`	 continuous | minRate=5.00Hz | maxRate=25.00Hz | FIFO (max,reserved) = (1365, 0) events | non-wakeUp | |`,
 				`0x00000001) TMD2725 Proximity (wake-up) | AMS             | ver: 1 | type: android.sensor.proximity(8) | perm: n/a | flags: 0x00000003`,
 				`on-change | maxDelay=0us | minDelay=0us | FIFO (max,reserved) = (10000, 300) events | wakeUp | `,
 				`0x00000002) BMP380 Barometer          | Bosch           | ver: 8709 | type: android.sensor.pressure(6) | perm: n/a | flags: 0x00000000`,
@@ -292,6 +294,19 @@ func TestParseMetaInfo(t *testing.T) {
 					-10000: {
 						Name:   `GPS`,
 						Number: -10000,
+					},
+					0: {
+						Name:        `CrosEC Compass`,
+						Type:        `android.sensor.magnetic_field`,
+						Number:      0,
+						Version:     1,
+						RequestMode: `continuous`,
+						WakeUp:      false,
+						MinRate:     5,
+						MaxRate:     25,
+						Batch:       true,
+						Max:         1365,
+						Reserved:    0,
 					},
 					1: {
 						Name:        `TMD2725 Proximity (wake-up)`,

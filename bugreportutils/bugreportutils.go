@@ -76,8 +76,7 @@ var (
 	sensorLineOneRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\)\s*` +
 		`(?P<sensorName>[^|]+)` + `\s*\|` + `(?P<sensorManufacturer>[^|]+)` + `\|\s*ver:\s*` +
 		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` +
-		`\(\d+\)\s*\|` + `\s*perm:\s*` + `(?P<sensorPerm>[^|]+)` + `\s*\|\s*flags:\s*` +
-		`(?P<sensorFlag>0x?[0-9A-Fa-f]+)`)
+		`\(\d+\)\s*\|` + `\s*perm:\s*` + `(?P<sensorPerm>[^|]+)`)
 
 	// sensorLineTwoRE is a regular expression to match the second line of sensor information
 	// from the sensor list line in the sensorservice dump in the bugreport starting
@@ -319,8 +318,6 @@ Loop:
 			if err != nil {
 				return nil, err
 			}
-			curNum = int32(n)
-
 			v, err := strconv.Atoi(result["versionNumber"])
 			if err != nil {
 				return nil, err
