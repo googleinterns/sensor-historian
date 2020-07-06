@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	// GPSSensorNumber is the hard-coded sensor number defined in frameworks/base/core/java/android/os/BatteryStats.Sensor
+	// GPSSensorNumber is the hard-coded sensor number defined in
+	// frameworks/base/core/java/android/os/BatteryStats.Sensor
 	GPSSensorNumber = -10000
 
 	// TimeLayout is the timestamp layout commonly printed in bug reports.
@@ -88,22 +89,32 @@ var (
 	// BatchingDataRE is a regular expression that matches the max and reserved data quantity
 	// from the sensor infomration listed in the sensorservice dump of a bug report.
 	// e.g FIFO (max,reserved) = (10000, 3000) events
+	// BatchingDataRE is used for bugreport starting from NRD42 and onwards.
 	BatchingDataRE = regexp.MustCompile(`FIFO\s*\(max,reserved\)\s*=\s*\(` + `(?P<maxNum>\d+)` +
 		`,` + `(?P<reservedNum>[^|]+)` + `\) events\s*`)
 
-	rateRE    = regexp.MustCompile(`=(?P<rateVal>[\-\+]?[0-9]*(\.[0-9]+)+)Hz`)
-	delayRE   = regexp.MustCompile(`=(?P<delayVal>[\-\+]?\d+)us`)
+	// rateRE is a regular expression that matches the minRate/maxRate information listed for
+	// each sensor in the sensorservice dump section.
+	rateRE = regexp.MustCompile(`=(?P<rateVal>[\-\+]?[0-9]*(\.[0-9]+)+)Hz`)
+
+	// delayRE is a regular expression that matches the maxDelay/minDelay information listed for
+	// each sensor in the sensorservice dump section.
+	delayRE = regexp.MustCompile(`=(?P<delayVal>[\-\+]?\d+)us`)
+
+	// fifoMaxRE is a regular expression that matches the fifomax information listed for
+	// each sensor in the sensorservice dump section, from MNC or before.
 	fifoMaxRE = regexp.MustCompile(`FifoMax=` + `(?P<maxNum>[^|]+)` + `\s*events`)
 
 	// TimeZoneRE is a regular expression to match the timezone string in a bug report.
 	TimeZoneRE = regexp.MustCompile(`^\[persist.sys.timezone\]:\s+\[` + `(?P<timezone>\S+)\]`)
 
-	// DumpstateRE is a regular expression that matches the time information from the dumpstate line
-	// at the start of a bug report.
+	// DumpstateRE is a regular expression that matches the time information from the dumpstate
+	// line at the start of a bug report.
 	DumpstateRE = regexp.MustCompile(`==\sdumpstate:\s(?P<timestamp>\d+-\d+-\d+\s\d+:\d+:\d+)`)
 )
 
-// Contents returns a map of the contents of each file from the given bytes slice, with the key being the file name.
+// Contents returns a map of the contents of each file from the given bytes slice, with the key
+// being the file name.
 // Supported file formats are text/plain and application/zip.
 // For zipped files, each file name will be prepended by the zip file's name.
 // An error will be non-nil for processing issues.
@@ -144,7 +155,8 @@ func unzipAndExtract(fname string, b []byte) (map[string][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error copying from ZIP file: %v", err)
 		}
-		// Don't recursively extract from any sub-ZIP files since we use this to also extract .jar files for Closure.
+		// Don't recursively extract from any sub-ZIP files since we use this to also
+		// extract .jar files for Closure.
 		files[fname+"~"+f.Name] = zc.Bytes()
 	}
 	return files, nil
@@ -161,9 +173,11 @@ type MetaInfo struct {
 
 // SensorInfo contains basic information about a device's sensor.
 type SensorInfo struct {
-	Name, Type         string
-	Version, Number    int32
-	TotalTimeMs        int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
+	Name, Type      string
+	Version, Number int32
+	// time.Duration in Golang is converted to nanoseconds in JS,
+	// so using int64 and naming convention to be clear in$
+	TotalTimeMs        int64
 	Count              float32
 	RequestMode        string
 	MaxDelay, MinDelay int32
@@ -217,7 +231,7 @@ func ParseMetaInfo(input string) (*MetaInfo, error) {
 	}, err
 }
 
-// extractSensorInfo extracts device sensor information found in the sensorservice dump of a bug report.
+// extractSensorInfo extracts device sensor information found in the sensorservice dump of a bugreport.
 func extractSensorInfo(input string) (map[int32]SensorInfo, error) {
 	inSSection := false
 	sensors := make(map[int32]SensorInfo)
@@ -489,7 +503,8 @@ func ExtractPIDMappings(contents string) (map[string][]AppInfo, []string) {
 	return mapping, warnings
 }
 
-// TimeStampToMs converts a timestamp in the TimeLayout format, combined with the fraction of a second, to a unix ms timestamp based on the location.
+// TimeStampToMs converts a timestamp in the TimeLayout format, combined with the fraction of
+// a second, to a unix ms timestamp based on the location.
 func TimeStampToMs(timestamp, remainder string, loc *time.Location) (int64, error) {
 	if loc == nil {
 		return 0, errors.New("missing location")
@@ -498,7 +513,8 @@ func TimeStampToMs(timestamp, remainder string, loc *time.Location) (int64, erro
 	if err != nil {
 		return 0, err
 	}
-	// The remainder represents the fraction of a second. e.g. timestamp 2015-05-28 19:50:27.123456 has remainder 123456.
+	// The remainder represents the fraction of a second.
+	// e.g. timestamp 2015-05-28 19:50:27.123456 has remainder 123456.
 	ms, err := SecFractionAsMs(remainder)
 	if err != nil {
 		return 0, err

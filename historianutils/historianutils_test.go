@@ -85,11 +85,13 @@ func TestParseDurationWithDays(t *testing.T) {
 		gotMs, err := ParseDurationWithDays(test.unparsedDur)
 		gotErr := err != nil
 		if gotErr != test.wantErr {
-			t.Errorf("ParseDuration(%s) got err: %v, want err %v", test.unparsedDur, gotErr, test.wantErr)
+			t.Errorf("ParseDuration(%s) got err: %v, want err %v",
+				test.unparsedDur, gotErr, test.wantErr)
 			continue
 		}
 		if gotMs != test.wantMs {
-			t.Errorf("ParseDuration(%s) got ms: %d, want ms %d", test.unparsedDur, gotMs, test.wantMs)
+			t.Errorf("ParseDuration(%s) got ms: %d, want ms %d",
+				test.unparsedDur, gotMs, test.wantMs)
 		}
 	}
 }

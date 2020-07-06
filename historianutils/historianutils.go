@@ -20,6 +20,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"math"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -35,7 +36,8 @@ var (
 	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>.*):`)
 
 	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.
-	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
+	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` +
+		`@` + `(?P<suffix>\S+\.\S+)`)
 
 	// piiSyncRE is a regular expression to match any PII string of the form *sync*/blah/blah/pii
 	piiSyncRE = regexp.MustCompile(`(?P<prefix>\*sync\*/\S+/)(?P<account>\S+)`)
@@ -110,14 +112,12 @@ func MaxInt64(a int64, b int64) int64 {
 
 // RoundFloat returns the closest integer to the given float number.
 func RoundFloat(val float64) int32 {
-	if val < 0 {
-		return int32(val - 0.5)
-	}
-	return int32(val + 0.5)
+	return int32(math.Round(val))
 }
 
 // ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
-// This is the same as Golang's time.ParseDuration, but also handles days. Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
+// This is the same as Golang's time.ParseDuration, but also handles days.
+// Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
 func ParseDurationWithDays(input string) (int64, error) {
 	if input == "" {
 		return 0, errors.New("cannot parse duration from empty string")

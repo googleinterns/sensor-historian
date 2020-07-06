@@ -70,10 +70,12 @@ func TestTimeStampToMs(t *testing.T) {
 	for _, test := range tests {
 		got, err := TimeStampToMs(test.timestamp, test.remainder, test.loc)
 		if !reflect.DeepEqual(err, test.wantErr) {
-			t.Errorf("%v: TimeStampToMs(%v, %v)\n got err: %v\n want err: %v", test.desc, test.timestamp, test.remainder, err, test.wantErr)
+			t.Errorf("%v: TimeStampToMs(%v, %v)\n got err: %v\n want err: %v",
+				test.desc, test.timestamp, test.remainder, err, test.wantErr)
 		}
 		if got != test.want {
-			t.Errorf("%v: TimeStampToMs(%v, %v)\n got: %v\n want: %v", test.desc, test.timestamp, test.remainder, got, test.want)
+			t.Errorf("%v: TimeStampToMs(%v, %v)\n got: %v\n want: %v",
+				test.desc, test.timestamp, test.remainder, got, test.want)
 		}
 	}
 }
@@ -155,13 +157,15 @@ func TestTimeZone(t *testing.T) {
 		got, err := TimeZone(input)
 
 		if !reflect.DeepEqual(err, test.wantErr) {
-			t.Errorf("%v: TimeZone(%v)\n got err: %v\n want err: %v", test.desc, input, err, test.wantErr)
+			t.Errorf("%v: TimeZone(%v)\n got err: %v\n want err: %v",
+				test.desc, input, err, test.wantErr)
 		}
 		if test.wantErr != nil {
 			continue
 		}
 		if got.String() != test.want {
-			t.Errorf("%v: TimeZone(%v)\n got: %q\n want: %q", test.desc, input, got.String(), test.want)
+			t.Errorf("%v: TimeZone(%v)\n got: %q\n want: %q",
+				test.desc, input, got.String(), test.want)
 		}
 	}
 }
@@ -264,7 +268,8 @@ func TestParseMetaInfo(t *testing.T) {
 				`...`,
 				`[ro.build.id]: [LRX22C]`,
 				`[ro.build.version.sdk]: [21]`,
-				` [ro.product.model]: [Nexus 5]`, // space intentionally added to make sure it doesn't affect extraction
+				// space intentionally added to make sure it doesn't affect extraction
+				` [ro.product.model]: [Nexus 5]`,
 				`...`,
 				`Client:`,
 				`  DeviceID: 123456789012345678`,
@@ -497,7 +502,8 @@ func TestParseMetaInfo(t *testing.T) {
 				`...`,
 				`[ro.build.id]: [LRX22C]`,
 				`[ro.build.version.sdk]: [21]`,
-				` [ro.product.model]: [Nexus 5]`, // space intentionally added to make sure it doesn't affect extraction
+				// space intentionally added to make sure it doesn't affect extraction
+				` [ro.product.model]: [Nexus 5]`,
 				`...`,
 				`Client:`,
 				`  DeviceID: 123456789012345678`,
@@ -637,10 +643,12 @@ func TestExtractPIDMappings(t *testing.T) {
 	for _, test := range tests {
 		pm, warns := ExtractPIDMappings(strings.Join(test.input, "\n"))
 		if !reflect.DeepEqual(pm, test.want) {
-			t.Errorf("%v--ExtractPIDMappings(%v):\n  got: %v\n  want: %v", test.desc, test.input, pm, test.want)
+			t.Errorf("%v--ExtractPIDMappings(%v):\n  got: %v\n  want: %v",
+				test.desc, test.input, pm, test.want)
 		}
 		if !reflect.DeepEqual(warns, test.wantWarnings) {
-			t.Errorf("%v--ExtractPIDMappings(%v):\n  got warnings: %v\n  want: %v", test.desc, test.input, warns, test.wantWarnings)
+			t.Errorf("%v--ExtractPIDMappings(%v):\n  got warnings: %v\n  want: %v",
+				test.desc, test.input, warns, test.wantWarnings)
 		}
 	}
 }
