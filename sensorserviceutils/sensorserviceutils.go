@@ -26,45 +26,58 @@ import (
 	"github.com/googleinterns/sensor-historian/bugreportutils"
 	"github.com/googleinterns/sensor-historian/csv"
 	"github.com/googleinterns/sensor-historian/historianutils"
+	acpb "github.com/googleinterns/sensor-historian/pb/activeconnection_proto"
 )
 
 var (
 	// Each of the connectionLineXRE is a regular expression to match the X line of
-	// connection information in the sensorservice dump in the bugreport starting
-	// from NRD42 and onwards.
+	// connection information in the sensorservice dump in the bugreport across all version.
 	connLineOneRE   = regexp.MustCompile(`\s*Connection\s+Number:\s*` + `(?P<connNum>\d+)`)
 	connLineTwoRE   = regexp.MustCompile(`\s*Operating\s+Mode: (?P<connMode>[^(]+)` + `\s*`)
 	connLineThreeRE = regexp.MustCompile(`\s*(?P<packageName>[^(]+)` + `\s*\|\s*` +
 		`WakeLockRefCount\s*(?P<wakeLockRefCount>\d+)` + `\s*\|\s*` + `uid\s*(?P<uid>\d+)`)
-	connLineFourRE = regexp.MustCompile(`(?P<sensorHandle>0x?[0-9A-Fa-f]+)` + `\s*\|\s*` +
+	connLineFourRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*\|\s*` +
 		`status:\s*(?P<status>[^(]+)` + `\s*\|\s*` + `pending\s*flush\s*events\s*` +
 		`(?P<pendingFlush>\d+)`)
 
 	// activeConnRE is a regular expression to match the section for active connections in the
-	// sensorservice dump in the bugreport starting from NRD42 and onwards.
+	// sensorservice dump in the bugreport across all version.
 	activeConnRE = regexp.MustCompile(`\s*active\s*connections\s*`)
 
 	// directConnRE is a regular expression to match the section for direct connections in the
-	// sensorservice dump in the bugreport starting from NRD42 and onwards.
+	// sensorservice dump in the bugreport across all version.
 	directConnRE = regexp.MustCompile(`\s*direct\s*connections\s*`)
 
-	// prevRegistrationRE is a regular expression to match the section for previous connections in the
-	// sensorservice dump in the bugreport starting from NRD42 and onwards.
+	// prevRegistrationRE is a regular expression to match the section for previous connections i
+	// in the sensorservice dump in the bugreport across all version.
 	prevRegistrationRE = regexp.MustCompile(`Previous` + `\s*` + `Registrations:`)
 
 	// addRegistrationRE is a regular expression to match the log that adds subscription in the
-	// sensorservice dump in the bubgreport starting from NRD42 and onwards.
+	// sensorservice dump in the bugreport starting from NRD42 and onwards.
 	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
-		`\s*(?P<sensorHandle>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
+		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)` +
 		`\s*samplingPeriod=\s*` + `(?P<samplingPeriod>\d+)us` + `\s*batchingPeriod=\s*` +
 		`(?P<batchingPeriod>\d+)us`)
 
 	// removeRegistrationRE is a regular expression to match the log that removes subscription in
-	// the sensorservice dump in the bubgreport starting from NRD42 and onwards.
+	// the sensorservice dump in the bugreport starting from NRD42 and onwards.
 	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
-		`\s*(?P<sensorHandle>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
+		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)`)
+
+	// actRegistrationRE is a regular expression to match the log that activates subscription in the
+	// sensorservice dump in the bugreport starting from MNC or before.
+	actRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `activated` +
+		`\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
+		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*samplingPeriod=\s*` +
+		`(?P<samplingPeriod>\d+)us` + `\s*maxReportLatency=\s*` + `(?P<batchingPeriod>\d+)us`)
+
+	// deactRegistrationRE is a regular expression to match the log that removes subscription in
+	// the sensorservice dump in the bugreport starting from MNC or before.
+	deactRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` +
+		`de\-activated` + `\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
+		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)`)
 
 	// timeLayoutRE is a regular expression to match the timestamp with dates that may probably
 	// show up in the bugreport.
@@ -73,29 +86,22 @@ var (
 
 const (
 	sensorRegisDesc = "Sensorservice Registration"
-	completedStr    = "complete"
+	activeConnDesc  = "Active Connection"
+	completeStr     = "complete"
 	activeStr       = "active"
+	errorStr        = "error"
 	// unknownTime is used when the start or end time of an event is unknown.
 	// This is not zero as csv.AddEntryWithOpt ignores events with a zero time.
 	unknownTime = -1
 )
 
-// ActiveConnInfo contains basic information about an active connection when the bugreport is created.
-type ActiveConnInfo struct {
-	Number        int32
-	OperatingMode string
-	PackageName   string
-	UID           int32
-	SensorHandle  int32
-	PendingFlush  int32
-}
-
 // SubscriptionInfo contains information about one subscription event of a sensor to an application.
-// Each subscription event is captured by the + statement that adds the subscription and
-// the - statement that removes the subscription.
+// For NRD42 and onwards Android versions: easch subscription event is captured by the + statement
+// that adds the subscription and the - statement that removes the subscription .
+// For MNC or before: each subscription event is captured by the activated/de-activated statments.
 type SubscriptionInfo struct {
 	StartMs, EndMs int64
-	SensorHandle   int32
+	SensorNumber   int32
 	UID, PID       int32
 	SamplingPeriod int32
 	BatchingPeroid int32
@@ -123,11 +129,14 @@ type parser struct {
 	csvState *csv.State
 	errs     []error
 
-	Sensors     map[int32]*bugreportutils.SensorInfo
-	ActiveConns map[int32]*ActiveConnInfo
-	// ActiveSensors is a map from sensor handle ID to a map from UID to the active connection number
+	// Sensors is a map from sensor number to sensorInfo, it directly adoptes the Sensors map
+	// define in the bugreportutils packaged.
+	Sensors map[int32]bugreportutils.SensorInfo
+	// ActiveConns is a map from the active connection number to the corresponding connection info.
+	ActiveConns map[int32]*acpb.ActiveConn
+	// ActiveSensors is a map from sensor number to a map from UID to the active connection number.
 	ActiveSensors map[int32]map[int32]int32
-	// HistoryByUID is a map from UID to a map from sensor handle to SubscriptionInfo
+	// HistoryByUID is a map from UID to a map from sensor number to SubscriptionInfo.
 	HistoryByUID map[int32]map[int32]*SubscriptionInfo
 }
 
@@ -167,18 +176,19 @@ func (p *parser) valid() bool {
 	return (p.idx < len(p.lines)) && (p.idx >= 0)
 }
 
-// Parse writes record all sensor activities in the sensorservice section as CSV entry.
+// Parse function collects information regarding active connections and records availalbe sensor
+// subscription events in the sensorservice section as CSV entry.
 // Errors encountered during parsing will be collected into an errors slice and
 // will continue parsing remaining events.
-func Parse(f string, meta *bugreportutils.MetaInfo) (string, []error) {
+func Parse(f string, meta *bugreportutils.MetaInfo) ([]*acpb.ActiveConn, []error) {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
-		return "", []error{err}
+		return nil, []error{err}
 	}
 	// Extract the year and month from the bugreport dumpstate line.
 	d, err := bugreportutils.DumpState(f)
 	if err != nil {
-		return "", []error{fmt.Errorf("could not find dumpstate information in the bugreport: %v", err)}
+		return nil, []error{fmt.Errorf("could not find dumpstate information in the bugreport: %v", err)}
 	}
 	buf := new(bytes.Buffer)
 	p := &parser{
@@ -189,7 +199,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) (string, []error) {
 		buf:            buf,
 		csvState:       csv.NewState(buf, true),
 		lines:          strings.Split(f, "\n"),
-		ActiveConns:    make(map[int32]*ActiveConnInfo),
+		ActiveConns:    make(map[int32]*acpb.ActiveConn),
 		ActiveSensors:  make(map[int32]map[int32]int32),
 		HistoryByUID:   make(map[int32]map[int32]*SubscriptionInfo),
 		Sensors:        meta.Sensors,
@@ -199,7 +209,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) (string, []error) {
 		l := p.line() // Read the current line and advance the line position.
 		// Active connection parsing.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
-			if err := p.extractSnapShotInfo(); err != nil {
+			if err := p.extractActiveConnInfo(); err != nil {
 				p.errs = append(p.errs, err)
 			}
 			continue
@@ -212,13 +222,12 @@ func Parse(f string, meta *bugreportutils.MetaInfo) (string, []error) {
 			continue
 		}
 	}
-	p.csvState.PrintActiveEvent(sensorRegisDesc, unknownTime)
-	return p.buf.String(), p.errs
+	return p.createActiveConnPB(), p.errs
 }
 
-// extractSnapShotInfo extracts active connections information found in the sensorservice dump of
-// a bugreport. It also record the information for active sensors
-func (p *parser) extractSnapShotInfo() error {
+// extractActiveConnInfo extracts active connections information found in the sensorservice dump of
+// a bugreport.
+func (p parser) extractActiveConnInfo() error {
 	curConnNum := int32(-1)
 	for p.valid() {
 		line := p.line()
@@ -227,7 +236,13 @@ func (p *parser) extractSnapShotInfo() error {
 			p.prevline()
 			return nil
 		}
-		// Each active connection's information needs four lines to record.
+		// In Android MNC or before, the direct connesction section may not exist if there is no
+		// direct connection. So the section stops when reaching the previous registration section.
+		if inPrevRegis, _ := historianutils.SubexpNames(prevRegistrationRE, line); inPrevRegis {
+			p.prevline()
+			return nil
+		}
+		// For all Android version: each active connection's information needs four lines to record.
 		if lineOne, result := historianutils.SubexpNames(connLineOneRE, line); lineOne {
 			connNum, err := strconv.Atoi(result["connNum"])
 			if err != nil {
@@ -235,13 +250,15 @@ func (p *parser) extractSnapShotInfo() error {
 					result["connNum"], err))
 				continue
 			}
-			curConnNum = int32(connNum)
+			// Since proto buff restricts that field numbers must be positive integers,
+			// we will add to all the connection number and will not use zero-indexing.
+			curConnNum = int32(connNum) + 1
 			if _, ok := p.ActiveConns[curConnNum]; !ok {
-				p.ActiveConns[curConnNum] = &ActiveConnInfo{
+				p.ActiveConns[curConnNum] = &acpb.ActiveConn{
 					Number:        curConnNum,
 					UID:           -1,
 					PendingFlush:  -1,
-					SensorHandle:  -1,
+					SensorNumber:  -1,
 					OperatingMode: ``,
 					PackageName:   ``,
 				}
@@ -264,14 +281,14 @@ func (p *parser) extractSnapShotInfo() error {
 				p.ActiveConns[curConnNum].UID = int32(uid)
 				p.ActiveConns[curConnNum].PackageName = result["packageName"]
 			} else if lineFour, result := historianutils.SubexpNames(connLineFourRE, line); lineFour {
-				sensorHandle, err := strconv.ParseInt(result["sensorHandle"], 0, 32)
+				sensorNumber, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 				if err != nil {
 					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse sensor handle %v:%v",
-						curConnNum, result["sensorhandle"], err))
+						curConnNum, result["sensorNumber"], err))
 					continue
 				}
-				sensor := int32(sensorHandle)
-				p.ActiveConns[curConnNum].SensorHandle = sensor
+				sensor := int32(sensorNumber)
+				p.ActiveConns[curConnNum].SensorNumber = sensor
 				uid := p.ActiveConns[curConnNum].UID
 				if p.ActiveSensors[sensor] == nil {
 					p.ActiveSensors[sensor] = make(map[int32]int32)
@@ -290,6 +307,16 @@ func (p *parser) extractSnapShotInfo() error {
 		}
 	}
 	return nil
+}
+
+// createActiveConnPB create a list of active connection information based on the map built while
+// parsing sensorservice dump.
+func (p *parser) createActiveConnPB() []*acpb.ActiveConn {
+	var activeConnections []*acpb.ActiveConn
+	for _, conn := range p.ActiveConns {
+		activeConnections = append(activeConnections, conn)
+	}
+	return activeConnections
 }
 
 // extractRegistrationHistory extracts all previous registration information found
@@ -324,17 +351,17 @@ func (p *parser) extractRegistrationHistory() error {
 			continue
 		}
 
-		handle, err := strconv.ParseInt(result["sensorHandle"], 0, 32)
+		handle, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 		if err != nil {
-			p.errs = append(p.errs, fmt.Errorf("error parsing sensorHandle %v for line %v: %v",
-				result["sensorHandle"], l, err))
+			p.errs = append(p.errs, fmt.Errorf("error parsing sensorNumber %v for line %v: %v",
+				result["sensorNumber"], l, err))
 			continue
 		}
-		sensorhandle := int32(handle)
-		_, exist := p.Sensors[sensorhandle]
+		sensorNumber := int32(handle)
+		_, exist := p.Sensors[sensorNumber]
 		if !exist {
 			p.errs = append(p.errs, fmt.Errorf("sensor=%d: invalid subscription for an non-existing sensor",
-				sensorhandle))
+				sensorNumber))
 			continue
 		}
 
@@ -353,17 +380,17 @@ func (p *parser) extractRegistrationHistory() error {
 				p.HistoryByUID[uid] = make(map[int32]*SubscriptionInfo)
 			}
 			// The HistoryByUID vairable only has an event if the app unsubscribed the sensor.
-			if _, exist := p.HistoryByUID[uid][sensorhandle]; exist {
+			if _, exist := p.HistoryByUID[uid][sensorNumber]; exist {
 				p.errs = append(p.errs, fmt.Errorf("uid=%d: this app unsubscribed sensor %d twice without subscribing it",
-					uid, sensorhandle))
+					uid, sensorNumber))
 			} else {
 				var eventInfo = &SubscriptionInfo{
 					StartMs:      -1,
 					EndMs:        timestamp,
-					SensorHandle: sensorhandle,
+					SensorNumber: sensorNumber,
 					UID:          uid,
 				}
-				p.HistoryByUID[uid][sensorhandle] = eventInfo
+				p.HistoryByUID[uid][sensorNumber] = eventInfo
 			}
 		} else if add {
 			pid, err := strconv.Atoi(result["pid"])
@@ -385,13 +412,13 @@ func (p *parser) extractRegistrationHistory() error {
 				continue
 			}
 
-			v := fmt.Sprintf("%d,%d,%d,%d,%d", sensorhandle, uid, pid, samplingPeriod, batchingPeriod)
-			identifier := fmt.Sprintf("%d,%d,%d", sensorhandle, uid, pid)
+			v := fmt.Sprintf("%d,%d,%d,%d,%d", sensorNumber, uid, pid, samplingPeriod, batchingPeriod)
+			identifier := fmt.Sprintf("%d,%d,%d", sensorNumber, uid, pid)
 
-			event, exist := p.HistoryByUID[uid][sensorhandle]
+			event, exist := p.HistoryByUID[uid][sensorNumber]
 			if !exist {
 				// If there is no history of removing a subscription, the registration can be active.
-				_, ok := p.ActiveSensors[sensorhandle][uid]
+				_, ok := p.ActiveSensors[sensorNumber][uid]
 				if ok {
 					entry := csv.Entry{
 						Desc:       sensorRegisDesc,
@@ -404,18 +431,18 @@ func (p *parser) extractRegistrationHistory() error {
 					continue
 				}
 				p.errs = append(p.errs, fmt.Errorf("uid=%d: wrong subscription history with sensor %d",
-					uid, sensorhandle))
+					uid, sensorNumber))
 			} else {
 				entry := csv.Entry{
 					Desc:       sensorRegisDesc,
 					Start:      timestamp,
-					Type:       completedStr,
+					Type:       completeStr,
 					Value:      v,
 					Identifier: identifier,
 				}
 				p.csvState.StartEvent(entry)
 				p.csvState.EndEvent(sensorRegisDesc, identifier, event.EndMs)
-				delete(p.HistoryByUID[uid], sensorhandle)
+				delete(p.HistoryByUID[uid], sensorNumber)
 			}
 		}
 	}
@@ -427,6 +454,7 @@ func validMonth(m int) bool {
 	return m >= int(time.January) && m <= int(time.December)
 }
 
+// This function is directly copied from the activity.go file
 // fullTimestamp constructs the unix ms timestamp from the given date and time information.
 // Since previous registration events have no corresponding year, we reconstruct the full timestamp
 // using the stored reference year ands month extracted from the dumpstate line of the bug report.
@@ -462,6 +490,7 @@ func (p *parser) fullTimestamp(month, day, partialTimestamp string) (int64, erro
 		remainder, p.loc)
 }
 
+// This function is directly copied froms the activity.go file
 // msToTime converts milliseconds since Unix Epoch to a time.Time object.
 func msToTime(ms int64) time.Time {
 	return time.Unix(0, ms*int64(time.Millisecond))

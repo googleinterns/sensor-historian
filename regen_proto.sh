@@ -19,8 +19,9 @@
 # To regenerate the compiled Go files if the protos are modified.
 cd $GOPATH/src/
 
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/build_proto/*.proto
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_proto/*.proto
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/usagestats_proto/*.proto
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/session_proto/*.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/activeconnection_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/activeconnection_proto/activeconnection.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/build_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/build_proto/*.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/batterystats_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_proto/*.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/metrics_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/usagestats_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/usagestats_proto/*.proto
+protoc -I=github.com/googleinterns/sensor-historian/pb/session_proto/ --go_out=. github.com/googleinterns/sensor-historian/pb/session_proto/*.proto
