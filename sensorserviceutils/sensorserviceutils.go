@@ -224,12 +224,12 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 			continue
 		}
 		// Previous registration parising.
-		// if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
-		// 	if err := p.extractRegistrationHistory(); err != nil {
-		// 		p.errs = append(p.errs, err)
-		// 	}
-		// 	continue
-		// }
+		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
+			if err := p.extractRegistrationHistory(); err != nil {
+				p.errs = append(p.errs, err)
+			}
+			continue
+		}
 	}
 	return OutputData{"", p.createActiveConnPB(), p.errs}
 }
@@ -310,8 +310,6 @@ func (p parser) extractActiveConnInfo() error {
 					continue
 				}
 				p.activeConns[curConnNum].PendingFlush = int32(pendingFlush)
-			} else {
-				return fmt.Errorf("error parsing active connection information")
 			}
 		}
 	}
@@ -326,6 +324,136 @@ func (p *parser) createActiveConnPB() []*acpb.ActiveConn {
 		activeConnections = append(activeConnections, conn)
 	}
 	return activeConnections
+}
+
+// extractRegistrationHistory extracts all previous registration information found
+// in the sensorservice dump of a bug report.
+func (p *parser) extractRegistrationHistory() error {
+	for p.valid() {
+		l := p.line()
+		var result map[string]string
+		add, _ := historianutils.SubexpNames(addRegistrationRE, l)
+		remove, result := historianutils.SubexpNames(removeRegistrationRE, l)
+		if !(add || remove) {
+			// End of the previous registration section
+			return nil
+		}
+
+		if add {
+			_, result = historianutils.SubexpNames(addRegistrationRE, l)
+		}
+
+		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
+		var timestamp int64
+		var timestampErr error
+		if hasDate {
+			timestamp, timestampErr = p.fullTimestamp(date["month"], date["day"], result["timeStamp"])
+		} else {
+			month := p.referenceMonth.String()
+			day := strconv.Itoa(p.referenceDay)
+			timestamp, timestampErr = p.fullTimestamp(month, day, result["timeStamp"])
+		}
+		if timestampErr != nil {
+			p.errs = append(p.errs, fmt.Errorf("error parsing timestamp for line %v: %v", l, timestampErr))
+			continue
+		}
+
+		handle, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+		if err != nil {
+			p.errs = append(p.errs, fmt.Errorf("error parsing sensorNumber %v for line %v: %v",
+				result["sensorNumber"], l, err))
+			continue
+		}
+		sensorNumber := int32(handle)
+		_, exist := p.sensors[sensorNumber]
+		if !exist {
+			p.errs = append(p.errs, fmt.Errorf("sensor=%d: invalid subscription for an non-existing sensor",
+				sensorNumber))
+			continue
+		}
+
+		u, err := strconv.Atoi(result["uid"])
+		if err != nil {
+			p.errs = append(p.errs, fmt.Errorf("error parsing uid %v for line %v: %v",
+				result["uid"], l, err))
+			continue
+		}
+		uid := int32(u)
+
+		// The history recorded by the previous registration section is recorded in an order where
+		// the most recent event is recorded first.
+		if remove {
+			if p.historyByUID[uid] == nil {
+				p.historyByUID[uid] = make(map[int32]*SubscriptionInfo)
+			}
+			// The HistoryByUID vairable only has an event if the app unsubscribed the sensor.
+			if _, exist := p.historyByUID[uid][sensorNumber]; exist {
+				p.errs = append(p.errs, fmt.Errorf("uid=%d: this app unsubscribed sensor %d twice without subscribing it",
+					uid, sensorNumber))
+			} else {
+				var eventInfo = &SubscriptionInfo{
+					StartMs:      -1,
+					EndMs:        timestamp,
+					SensorNumber: sensorNumber,
+					UID:          uid,
+				}
+				p.historyByUID[uid][sensorNumber] = eventInfo
+			}
+		} else if add {
+			pid, err := strconv.Atoi(result["pid"])
+			if err != nil {
+				p.errs = append(p.errs, fmt.Errorf("error parsing pid %v for line %v: %v",
+					result["pid"], l, err))
+				continue
+			}
+			samplingPeriod, err := strconv.Atoi(result["samplingPeriod"])
+			if err != nil {
+				p.errs = append(p.errs, fmt.Errorf("error parsing samplingPeriod %v for line %v: %v",
+					result["samplingPeriod"], l, err))
+				continue
+			}
+			batchingPeriod, err := strconv.Atoi(result["batchingPeriod"])
+			if err != nil {
+				p.errs = append(p.errs, fmt.Errorf("error parsing batchingPeriod %v for line %v: %v",
+					result["batchingPeriod"], l, err))
+				continue
+			}
+
+			v := fmt.Sprintf("%d,%d,%d,%d,%d", sensorNumber, uid, pid, samplingPeriod, batchingPeriod)
+			identifier := fmt.Sprintf("%d,%d,%d", sensorNumber, uid, pid)
+
+			event, exist := p.historyByUID[uid][sensorNumber]
+			if !exist {
+				// If there is no history of removing a subscription, the registration can be active.
+				_, ok := p.activeSensors[sensorNumber][uid]
+				if ok {
+					entry := csv.Entry{
+						Desc:       sensorRegisDesc,
+						Start:      timestamp,
+						Type:       activeStr,
+						Value:      v,
+						Identifier: identifier,
+					}
+					p.csvState.StartEvent(entry)
+					continue
+				}
+				p.errs = append(p.errs, fmt.Errorf("uid=%d: wrong subscription history with sensor %d",
+					uid, sensorNumber))
+			} else {
+				entry := csv.Entry{
+					Desc:       sensorRegisDesc,
+					Start:      timestamp,
+					Type:       completeStr,
+					Value:      v,
+					Identifier: identifier,
+				}
+				p.csvState.StartEvent(entry)
+				p.csvState.EndEvent(sensorRegisDesc, identifier, event.EndMs)
+				delete(p.historyByUID[uid], sensorNumber)
+			}
+		}
+	}
+	return nil
 }
 
 // This function is directly copied from the activity.go file
