@@ -47,6 +47,7 @@ import (
 	"github.com/googleinterns/sensor-historian/parseutils"
 	"github.com/googleinterns/sensor-historian/powermonitor"
 	"github.com/googleinterns/sensor-historian/presenter"
+	"github.com/googleinterns/sensor-historian/sensorserviceutils"
 	"github.com/googleinterns/sensor-historian/wearable"
 
 	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
@@ -72,6 +73,7 @@ const (
 	powerMonitorLog = "Power Monitor"
 	systemLog       = "System"
 	wearableLog     = "Wearable"
+	sensorService   = "Sensorservice"
 
 	// Analyzable file types.
 	bugreportFT    = "bugreport"
@@ -658,6 +660,10 @@ func writeTempFile(contents string) (string, error) {
 // saved as separate reports.
 func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string) error {
 
+	doSensoservice := func(ch chan sensorserviceutils.OutputData, contents string, meta *bugreportutils.MetaInfo) {
+		ch <- sensorserviceutils.Parse(contents, meta)
+	}
+
 	doActivity := func(ch chan activity.LogsData, contents string, pkgs []*usagepb.PackageInfo) {
 		ch <- activity.Parse(pkgs, contents)
 	}
@@ -790,6 +796,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		broadcastsCh := make(chan csvData)
 		dmesgCh := make(chan dmesg.Data)
 		wearableCh := make(chan string)
+		sensorserviceCh := make(chan sensorserviceutils.OutputData)
 		var checkinL, checkinE checkinData
 		var warnings []string
 		var bsStats *bspb.BatteryStats
@@ -837,6 +844,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			go doDmesg(dmesgCh, late.contents)
 			go doWearable(wearableCh, late.dt.Location().String(), late.contents)
 			go doSummaries(summariesCh, bsL, pkgsL)
+			go doSensoservice(sensorserviceCh, late.contents, late.meta)
 
 			checkinL = <-checkinLCh
 			errs = append(errs, checkinL.err...)
@@ -865,14 +873,16 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		var broadcastsOutput csvData
 		var dmesgOutput dmesg.Data
 		var wearableOutput string
+		var sensorserviceOutput sensorserviceutils.OutputData
 
 		if supV {
+			sensorserviceOutput = <-sensorserviceCh
 			summariesOutput = <-summariesCh
 			activityManagerOutput = <-activityManagerCh
 			broadcastsOutput = <-broadcastsCh
 			dmesgOutput = <-dmesgCh
 			wearableOutput = <-wearableCh
-			errs = append(errs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
+			errs = append(sensorserviceOutput.Errs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
 		}
 
 		warnings = append(warnings, activityManagerOutput.Warnings...)
@@ -903,6 +913,10 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			{
 				Source: broadcastsLog,
 				CSV:    broadcastsOutput.csv,
+			},
+			{
+				Source: sensorService,
+				CSV:    sensorserviceOutput.CSV,
 			},
 		}
 		for s, l := range activityManagerOutput.Logs {
