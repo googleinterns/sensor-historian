@@ -350,9 +350,28 @@ historian.singleView_ = [
     panel: historian.panels_.historian.selector,
     tabSelector: '#tab-historian-sensorservice',
     container: '#historian-sensorservice',
-    barOrder: [],
+    barOrder: [
+      {
+        source: historian.historianV2Logs.Sources.HEADING,
+        name: historian.metrics.Headings.CONTINUOUS
+      },
+      {
+        source: historian.historianV2Logs.Sources.HEADING,
+        name: historian.metrics.Headings.ON_CHANGE
+      },
+      {
+        source: historian.historianV2Logs.Sources.HEADING,
+        name: historian.metrics.Headings.ONE_SHOT
+      },
+      {
+        source: historian.historianV2Logs.Sources.HEADING,
+        name: historian.metrics.Headings.SPECIAL
+      },
+    ],
     barHidden: [],
-    logSources: [historian.historianV2Logs.Sources.SENSORSERVICE],
+    logSources: [
+      // historian.historianV2Logs.Sources.SENSORSERVICE
+    ],
     // Allow the user to add any event.
     logSourcesHidden: Object.keys(historian.historianV2Logs.Sources).map(
       function(source) {
