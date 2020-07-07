@@ -27,6 +27,7 @@ import (
 	"github.com/googleinterns/sensor-historian/csv"
 	"github.com/googleinterns/sensor-historian/historianutils"
 	acpb "github.com/googleinterns/sensor-historian/pb/activeconnection_proto"
+	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 var (
@@ -52,30 +53,30 @@ var (
 	// in the sensorservice dump in the bugreport across all version.
 	prevRegistrationRE = regexp.MustCompile(`Previous` + `\s*` + `Registrations:`)
 
-	// addRegistrationRE is a regular expression to match the log that adds subscription in the
+	// addRegistrationNewRE is a regular expression to match the log that adds subscription in the
 	// sensorservice dump in the bugreport starting from NRD42 and onwards.
-	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
+	addRegistrationNewRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
 		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)` +
 		`\s*samplingPeriod=\s*` + `(?P<samplingPeriod>\d+)us` + `\s*batchingPeriod=\s*` +
 		`(?P<batchingPeriod>\d+)us`)
 
-	// removeRegistrationRE is a regular expression to match the log that removes subscription in
+	// removeRegistrationNewRE is a regular expression to match the log that removes subscription in
 	// the sensorservice dump in the bugreport starting from NRD42 and onwards.
-	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
+	removeRegistrationNewRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
 		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)`)
 
-	// actRegistrationRE is a regular expression to match the log that activates subscription in the
+	// addRegistrationOldRE is a regular expression to match the log that activates subscription in the
 	// sensorservice dump in the bugreport starting from MNC or before.
-	actRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `activated` +
+	addRegistrationOldRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `activated` +
 		`\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
 		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*samplingPeriod=\s*` +
 		`(?P<samplingPeriod>\d+)us` + `\s*maxReportLatency=\s*` + `(?P<batchingPeriod>\d+)us`)
 
-	// deactRegistrationRE is a regular expression to match the log that removes subscription in
+	// removeRegistrationOldRE is a regular expression to match the log that removes subscription in
 	// the sensorservice dump in the bugreport starting from MNC or before.
-	deactRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` +
+	removeRegistrationOldRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` +
 		`de\-activated` + `\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
 		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)`)
 
@@ -110,7 +111,7 @@ type OutputData struct {
 type SubscriptionInfo struct {
 	StartMs, EndMs int64
 	SensorNumber   int32
-	UID, PID       int32
+	PackageName    string
 	SamplingPeriod int32
 	BatchingPeroid int32
 }
@@ -144,8 +145,9 @@ type parser struct {
 	activeConns map[int32]*acpb.ActiveConn
 	// activeSensors is a map from sensor number to a map from UID to the active connection number.
 	activeSensors map[int32]map[int32]int32
-	// historyByUID is a map from UID to a map from sensor number to SubscriptionInfo.
-	historyByUID map[int32]map[int32]*SubscriptionInfo
+	// historyByUID is a map from a key to SubscriptionInfo.
+	// Note that the key is a string formed by concatenating sensor number and package name.
+	history map[string]*SubscriptionInfo
 }
 
 // Returns the current line without advancing the line position.
@@ -210,7 +212,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		lines:          strings.Split(f, "\n"),
 		activeConns:    make(map[int32]*acpb.ActiveConn),
 		activeSensors:  make(map[int32]map[int32]int32),
-		historyByUID:   make(map[int32]map[int32]*SubscriptionInfo),
+		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
 
@@ -224,12 +226,12 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 			continue
 		}
 		// Previous registration parising.
-		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
-			if err := p.extractRegistrationHistory(); err != nil {
-				p.errs = append(p.errs, err)
-			}
-			continue
-		}
+		// if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
+		// 	if err := p.extractRegistrationHistory(); err != nil {
+		// 		p.errs = append(p.errs, err)
+		// 	}
+		// 	continue
+		// }
 	}
 	return OutputData{"", p.createActiveConnPB(), p.errs}
 }
@@ -328,21 +330,27 @@ func (p *parser) createActiveConnPB() []*acpb.ActiveConn {
 
 // extractRegistrationHistory extracts all previous registration information found
 // in the sensorservice dump of a bug report.
-func (p *parser) extractRegistrationHistory() error {
+func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) error {
 	for p.valid() {
 		l := p.line()
 		var result map[string]string
-		add, _ := historianutils.SubexpNames(addRegistrationRE, l)
-		remove, result := historianutils.SubexpNames(removeRegistrationRE, l)
-		if !(add || remove) {
-			// End of the previous registration section
+		isAdd := false
+		if addNew, match := historianutils.SubexpNames(addRegistrationNewRE, l); addNew {
+			result = match
+			isAdd = true
+		} else if addOld, match := historianutils.SubexpNames(addRegistrationNewRE, l); addOld {
+			result = match
+			isAdd = true
+		} else if removeNew, match := historianutils.SubexpNames(removeRegistrationNewRE, l); removeNew {
+			result = match
+		} else if removeOld, match := historianutils.SubexpNames(removeRegistrationOldRE, l); removeOld {
+			result = match
+		} else {
+			// Reach the end of the previous registration section.
 			return nil
 		}
 
-		if add {
-			_, result = historianutils.SubexpNames(addRegistrationRE, l)
-		}
-
+		// Get the timestamp of the record.
 		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
 		var timestamp int64
 		var timestampErr error
@@ -371,41 +379,10 @@ func (p *parser) extractRegistrationHistory() error {
 				sensorNumber))
 			continue
 		}
-
-		u, err := strconv.Atoi(result["uid"])
-		if err != nil {
-			p.errs = append(p.errs, fmt.Errorf("error parsing uid %v for line %v: %v",
-				result["uid"], l, err))
-			continue
-		}
-		uid := int32(u)
-
-		// The history recorded by the previous registration section is recorded in an order where
-		// the most recent event is recorded first.
-		if remove {
-			if p.historyByUID[uid] == nil {
-				p.historyByUID[uid] = make(map[int32]*SubscriptionInfo)
-			}
-			// The HistoryByUID vairable only has an event if the app unsubscribed the sensor.
-			if _, exist := p.historyByUID[uid][sensorNumber]; exist {
-				p.errs = append(p.errs, fmt.Errorf("uid=%d: this app unsubscribed sensor %d twice without subscribing it",
-					uid, sensorNumber))
-			} else {
-				var eventInfo = &SubscriptionInfo{
-					StartMs:      -1,
-					EndMs:        timestamp,
-					SensorNumber: sensorNumber,
-					UID:          uid,
-				}
-				p.historyByUID[uid][sensorNumber] = eventInfo
-			}
-		} else if add {
-			pid, err := strconv.Atoi(result["pid"])
-			if err != nil {
-				p.errs = append(p.errs, fmt.Errorf("error parsing pid %v for line %v: %v",
-					result["pid"], l, err))
-				continue
-			}
+		packageName := result["packageName"]
+		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+		var value string
+		if isAdd {
 			samplingPeriod, err := strconv.Atoi(result["samplingPeriod"])
 			if err != nil {
 				p.errs = append(p.errs, fmt.Errorf("error parsing samplingPeriod %v for line %v: %v",
@@ -418,38 +395,25 @@ func (p *parser) extractRegistrationHistory() error {
 					result["batchingPeriod"], l, err))
 				continue
 			}
+			value = fmt.Sprintf("%d,%d,%d,%s",
+				sensorNumber, samplingPeriod, batchingPeriod, packageName)
 
-			v := fmt.Sprintf("%d,%d,%d,%d,%d", sensorNumber, uid, pid, samplingPeriod, batchingPeriod)
-			identifier := fmt.Sprintf("%d,%d,%d", sensorNumber, uid, pid)
+			// If there is no history of removing a subscription, the subscription can still be active.
 
-			event, exist := p.historyByUID[uid][sensorNumber]
-			if !exist {
-				// If there is no history of removing a subscription, the registration can be active.
-				_, ok := p.activeSensors[sensorNumber][uid]
-				if ok {
-					entry := csv.Entry{
-						Desc:       sensorRegisDesc,
-						Start:      timestamp,
-						Type:       activeStr,
-						Value:      v,
-						Identifier: identifier,
-					}
-					p.csvState.StartEvent(entry)
-					continue
-				}
-				p.errs = append(p.errs, fmt.Errorf("uid=%d: wrong subscription history with sensor %d",
-					uid, sensorNumber))
+		} else {
+			// The history vairable only has an event if the package has unsubscribed the sensor.
+			if _, exist := p.history[identifier]; exist {
+				p.errs = append(p.errs,
+					fmt.Errorf("pkg=%s: this app unsubscribed sensor %d twice without subscribing it",
+						packageName, sensorNumber))
 			} else {
-				entry := csv.Entry{
-					Desc:       sensorRegisDesc,
-					Start:      timestamp,
-					Type:       completeStr,
-					Value:      v,
-					Identifier: identifier,
+				var eventInfo = &SubscriptionInfo{
+					StartMs:      -1,
+					EndMs:        timestamp,
+					SensorNumber: sensorNumber,
+					PackageName:  packageName,
 				}
-				p.csvState.StartEvent(entry)
-				p.csvState.EndEvent(sensorRegisDesc, identifier, event.EndMs)
-				delete(p.historyByUID[uid], sensorNumber)
+				p.history[identifier] = eventInfo
 			}
 		}
 	}
