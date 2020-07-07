@@ -52,30 +52,30 @@ var (
 	// in the sensorservice dump in the bugreport across all version.
 	prevRegistrationRE = regexp.MustCompile(`Previous` + `\s*` + `Registrations:`)
 
-	// addRegistrationRE is a regular expression to match the log that adds subscription in the
+	// addRegistrationNewRE is a regular expression to match the log that adds subscription in the
 	// sensorservice dump in the bugreport starting from NRD42 and onwards.
-	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
+	addRegistrationNewRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
 		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)` +
 		`\s*samplingPeriod=\s*` + `(?P<samplingPeriod>\d+)us` + `\s*batchingPeriod=\s*` +
 		`(?P<batchingPeriod>\d+)us`)
 
-	// removeRegistrationRE is a regular expression to match the log that removes subscription in
+	// removeRegistrationNewRE is a regular expression to match the log that removes subscription in
 	// the sensorservice dump in the bugreport starting from NRD42 and onwards.
-	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
+	removeRegistrationNewRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
 		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
 		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)`)
 
-	// actRegistrationRE is a regular expression to match the log that activates subscription in the
+	// addRegistrationOldRE is a regular expression to match the log that activates subscription in the
 	// sensorservice dump in the bugreport starting from MNC or before.
-	actRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `activated` +
+	addRegistrationOldRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `activated` +
 		`\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
 		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*samplingPeriod=\s*` +
 		`(?P<samplingPeriod>\d+)us` + `\s*maxReportLatency=\s*` + `(?P<batchingPeriod>\d+)us`)
 
-	// deactRegistrationRE is a regular expression to match the log that removes subscription in
+	// removeRegistrationOldRE is a regular expression to match the log that removes subscription in
 	// the sensorservice dump in the bugreport starting from MNC or before.
-	deactRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` +
+	removeRegistrationOldRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` +
 		`de\-activated` + `\s*package=\s*` + `(?P<packageName>[^(]+)` + `\s*handle=\s*` +
 		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)`)
 
@@ -110,7 +110,7 @@ type OutputData struct {
 type SubscriptionInfo struct {
 	StartMs, EndMs int64
 	SensorNumber   int32
-	UID, PID       int32
+	PackageName    string
 	SamplingPeriod int32
 	BatchingPeroid int32
 }
@@ -142,10 +142,12 @@ type parser struct {
 	sensors map[int32]bugreportutils.SensorInfo
 	// activeConns is a map from the active connection number to the corresponding connection info.
 	activeConns map[int32]*acpb.ActiveConn
-	// activeSensors is a map from sensor number to a map from UID to the active connection number.
-	activeSensors map[int32]map[int32]int32
-	// historyByUID is a map from UID to a map from sensor number to SubscriptionInfo.
-	historyByUID map[int32]map[int32]*SubscriptionInfo
+	// activeSensors is a map from sensor number to
+	// a map from packageName to the active connection number.
+	activeSensors map[int32]map[string]int32
+	// historyByUID is a map from a key to SubscriptionInfo.
+	// Note that the key is a string formed by concatenating sensor number and package name.
+	history map[string]*SubscriptionInfo
 }
 
 // Returns the current line without advancing the line position.
@@ -209,8 +211,8 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		csvState:       csv.NewState(buf, true),
 		lines:          strings.Split(f, "\n"),
 		activeConns:    make(map[int32]*acpb.ActiveConn),
-		activeSensors:  make(map[int32]map[int32]int32),
-		historyByUID:   make(map[int32]map[int32]*SubscriptionInfo),
+		activeSensors:  make(map[int32]map[string]int32),
+		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
 
@@ -298,11 +300,11 @@ func (p parser) extractActiveConnInfo() error {
 				}
 				sensor := int32(sensorNumber)
 				p.activeConns[curConnNum].SensorNumber = sensor
-				uid := p.activeConns[curConnNum].UID
+				PackageName := p.activeConns[curConnNum].PackageName
 				if p.activeSensors[sensor] == nil {
-					p.activeSensors[sensor] = make(map[int32]int32)
+					p.activeSensors[sensor] = make(map[string]int32)
 				}
-				p.activeSensors[sensor][uid] = curConnNum
+				p.activeSensors[sensor][PackageName] = curConnNum
 				pendingFlush, err := strconv.Atoi(result["pendingFlush"])
 				if err != nil {
 					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse pendingFlush %v:%v",
@@ -310,8 +312,6 @@ func (p parser) extractActiveConnInfo() error {
 					continue
 				}
 				p.activeConns[curConnNum].PendingFlush = int32(pendingFlush)
-			} else {
-				return fmt.Errorf("error parsing active connection information")
 			}
 		}
 	}
