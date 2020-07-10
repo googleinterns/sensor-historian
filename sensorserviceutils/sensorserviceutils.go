@@ -135,11 +135,9 @@ type parser struct {
 	// loc is the location parsed from timezone information in the bugreport.
 	// The previous registration is in the user's local timezone
 	// which we need to convert to UTC time.
-	loc *time.Location
-
-	lines []string
-	idx   int
-
+	loc         *time.Location
+	lines       []string
+	idx         int
 	buf         *bytes.Buffer
 	csvState    *csv.State
 	parsingErrs []error
