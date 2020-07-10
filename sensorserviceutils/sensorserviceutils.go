@@ -205,13 +205,15 @@ func (p *parser) valid() bool {
 func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
-		return OutputData{"", nil, nil, []error{err}}
+		return OutputData{"", nil, nil,
+			[]error{fmt.Errorf("missing time zone line in bug report: %v", err)}}
 	}
 	// Extract the year and month from the bugreport dumpstate line.
 	d, err := bugreportutils.DumpState(f)
 	if err != nil {
-		return OutputData{"", nil, nil,
-			[]error{fmt.Errorf("could not find dumpstate information in the bugreport: %v", err)}}
+		return OutputData{"", nil, nil, []error{
+			fmt.Errorf("could not find dumpstate information in the bugreport: %v",
+				err)}}
 	}
 	buf := new(bytes.Buffer)
 	p := &parser{
@@ -268,7 +270,8 @@ func (p parser) extractActiveConnInfo() error {
 			connNum, err := strconv.Atoi(result["connNum"])
 			if err != nil {
 				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("could not parse connection number %v:%v", result["connNum"], err))
+					fmt.Errorf("could not parse connection number %v:%v",
+						result["connNum"], err))
 				continue
 			}
 			// Since proto buff restricts that field numbers must be positive
