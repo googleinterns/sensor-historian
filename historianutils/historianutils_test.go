@@ -18,15 +18,39 @@ import (
 	"testing"
 )
 
+func TestRounding(t *testing.T) {
+	tests := []struct {
+		input float64
+		want  int32
+	}{
+		{input: 1.999,
+			want: 2},
+		{input: -1.999,
+			want: -2},
+		{input: 1.499,
+			want: 1},
+		{input: -1.499,
+			want: -1},
+		{input: 666666.667,
+			want: 666667},
+	}
+	for _, test := range tests {
+		result := RoundFloat(test.input)
+		if result != test.want {
+			t.Errorf("input:%v\n  got: %v\n  want: %v", test.input, result, test.want)
+		}
+	}
+}
+
 func TestScrubPII(t *testing.T) {
 	test := map[string]string{
-		"pureemail@google.com":                               "XXX@google.com",
-		"hyphen-ated@google.com":                             "XXX@google.com",
-		"under_score@google.com":                             "XXX@google.com",
-		"with.dot@google.com":                                "XXX@google.com",
-		"notAn-email":                                        "notAn-email",
-		"incomplete@":                                        "incomplete@",
-		"wake.lock@1a23b4":                                   "wake.lock@1a23b4", // There are some wakelocks with this name format
+		"pureemail@google.com":   "XXX@google.com",
+		"hyphen-ated@google.com": "XXX@google.com",
+		"under_score@google.com": "XXX@google.com",
+		"with.dot@google.com":    "XXX@google.com",
+		"notAn-email":            "notAn-email",
+		"incomplete@":            "incomplete@",
+		"wake.lock@1a23b4":       "wake.lock@1a23b4", // There are some wakelocks with this name format
 		"com.android.calendar/com.google/noogley@google.com": "com.android.calendar/com.google/XXX@google.com",
 		"lot-o-prefixes/with//com.google/noogley@google.com": "lot-o-prefixes/with//com.google/XXX@google.com",
 
@@ -61,11 +85,13 @@ func TestParseDurationWithDays(t *testing.T) {
 		gotMs, err := ParseDurationWithDays(test.unparsedDur)
 		gotErr := err != nil
 		if gotErr != test.wantErr {
-			t.Errorf("ParseDuration(%s) got err: %v, want err %v", test.unparsedDur, gotErr, test.wantErr)
+			t.Errorf("ParseDuration(%s) got err: %v, want err %v",
+				test.unparsedDur, gotErr, test.wantErr)
 			continue
 		}
 		if gotMs != test.wantMs {
-			t.Errorf("ParseDuration(%s) got ms: %d, want ms %d", test.unparsedDur, gotMs, test.wantMs)
+			t.Errorf("ParseDuration(%s) got ms: %d, want ms %d",
+				test.unparsedDur, gotMs, test.wantMs)
 		}
 	}
 }

@@ -32,7 +32,8 @@ import (
 )
 
 const (
-	// GPSSensorNumber is the hard-coded sensor number defined in frameworks/base/core/java/android/os/BatteryStats.Sensor
+	// GPSSensorNumber is the hard-coded sensor number defined in
+	// frameworks/base/core/java/android/os/BatteryStats.Sensor
 	GPSSensorNumber = -10000
 
 	// TimeLayout is the timestamp layout commonly printed in bug reports.
@@ -43,39 +44,77 @@ var (
 	// BugReportSectionRE is a regular expression to match the beginning of a bug report section.
 	BugReportSectionRE = regexp.MustCompile(`------\s+(?P<section>.*)\s+-----`)
 
-	// deviceIDRE is a regular expression that matches the "DeviceID" line
+	// deviceIDRE is a regular expression that matches the "DeviceID" line.
 	deviceIDRE = regexp.MustCompile("DeviceID: (?P<deviceID>[0-9]+)")
 
-	// sdkVersionRE is a regular expression that finds sdk version in the System Properties section of a bug report
+	// sdkVersionRE is a regular expression that finds sdk version in the System Properties section
+	// of a bug report.
 	sdkVersionRE = regexp.MustCompile(`\[ro.build.version.sdk\]:\s+\[(?P<sdkVersion>\d+)\]`)
 
-	// buildFingerprintRE is a regular expression to match any build fingerprint line in the bugreport
+	// buildFingerprintRE is a regular expression to match any build fingerprint line in the bugreport.
 	buildFingerprintRE = regexp.MustCompile(`Build\s+fingerprint:\s+'(?P<build>\S+)'`)
 
-	// modelNameRE is a regular expression that finds the model name line in the System Properties section of a bug report.
+	// modelNameRE is a regular expression that finds the model name line in the System Properties
+	// section of a bug report.
 	modelNameRE = regexp.MustCompile(`\[ro.product.model\]:\s+\[(?P<modelName>.*)\]`)
 
 	// pidRE is a regular expression to match PID to app name and UID.
-	pidRE = regexp.MustCompile(`PID #` + `(?P<pid>\d+)` + `: ProcessRecord[^:]+:` + `(?P<app>[^/]+)` + `/` + `(?P<uid>.*)` + `}`)
+	pidRE = regexp.MustCompile(`PID #` + `(?P<pid>\d+)` + `: ProcessRecord[^:]+:` +
+		`(?P<app>[^/]+)` + `/` + `(?P<uid>.*)` + `}`)
 
-	// sensorLineMMinusRE is a regular expression to match the sensor list line in the sensorservice dump of a bug report from MNC or before.
-	sensorLineMMinusRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` + `(?P<sensorManufacturer>[^|]+)` + `\|` +
-		`(\s*version=(?P<versionNumber>\d+)\s*\|)?` + `\s*(?P<sensorTypeString>[^|]+)` +
-		`\|` + `\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)`)
+	// sensorLineMMinusRE is a regular expression to match the sensor list line in the
+	// sensorservice dump of a bug report from MNC or before.
+	sensorLineMMinusRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` +
+		`(?P<sensorManufacturer>[^|]+)` + `\|` + `(\s*version=(?P<versionNumber>\d+)\s*\|)?` +
+		`\s*(?P<sensorTypeString>[^|]+)` + `\|` + `\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)\s*` + `\|` +
+		`.*` + `\|` + `\s*type=\d+\s*\|` + `\s*(?P<requestMode>[^|]+)` + `\s*\|` +
+		`(?P<variableOne>[^|]+)` + `\s*\|` + `(?P<variableTwo>[^|]+)` + `\s*\|` +
+		`(?P<batching>[^|]+)` + `\s*\|` + `(?P<wakeUp>[^|]+)`)
 
-	// sensorLineNPlusRE is a regular expression to match the sensor list line in the sensorservice dump of a bug report starting from NRD42 and onwards.
-	sensorLineNPlusRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\)\s*` +
+	// sensorLineOneRE is a regular expression to match the first line of sensor information
+	// from the sensor list line in the sensorservice dump in the bugreport starting
+	// from NRD42 and onwards.
+	sensorLineOneRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\)\s*` +
 		`(?P<sensorName>[^|]+)` + `\s*\|` + `(?P<sensorManufacturer>[^|]+)` + `\|\s*ver:\s*` +
-		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` + `\(\d+\)\s*\|`)
+		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` +
+		`\(\d+\)\s*\|` + `\s*perm:\s*` + `(?P<sensorPerm>[^|]+)`)
+
+	// sensorLineTwoRE is a regular expression to match the second line of sensor information
+	// from the sensor list line in the sensorservice dump in the bugreport starting
+	// from NRD42 and onwards.
+	sensorLineTwoRE = regexp.MustCompile(`\s*(?P<requestMode>[^|]+)` + `\s*\|` +
+		`(?P<variableOne>[^|]+)` + `\s*\|` + `(?P<variableTwo>[^|]+)` + `\s*\|` +
+		`(?P<batching>[^|]+)` + `\s*\|` + `(?P<wakeUp>[^|]+)`)
+
+	// BatchingDataRE is a regular expression that matches the max and reserved data quantity
+	// from the sensor infomration listed in the sensorservice dump of a bug report.
+	// e.g FIFO (max,reserved) = (10000, 3000) events
+	// BatchingDataRE is used for bugreport starting from NRD42 and onwards.
+	BatchingDataRE = regexp.MustCompile(`FIFO\s*\(max,reserved\)\s*=\s*\(` + `(?P<maxNum>\d+)` +
+		`,` + `(?P<reservedNum>[^|]+)` + `\) events\s*`)
+
+	// rateRE is a regular expression that matches the minRate/maxRate information listed for
+	// each sensor in the sensorservice dump section.
+	rateRE = regexp.MustCompile(`=(?P<rateVal>[\-\+]?[0-9]*(\.[0-9]+)+)Hz`)
+
+	// delayRE is a regular expression that matches the maxDelay/minDelay information listed for
+	// each sensor in the sensorservice dump section.
+	delayRE = regexp.MustCompile(`=(?P<delayVal>[\-\+]?\d+)us`)
+
+	// fifoMaxRE is a regular expression that matches the fifomax information listed for
+	// each sensor in the sensorservice dump section, from MNC or before.
+	fifoMaxRE = regexp.MustCompile(`FifoMax=` + `(?P<maxNum>[^|]+)` + `\s*events`)
 
 	// TimeZoneRE is a regular expression to match the timezone string in a bug report.
 	TimeZoneRE = regexp.MustCompile(`^\[persist.sys.timezone\]:\s+\[` + `(?P<timezone>\S+)\]`)
 
-	// DumpstateRE is a regular expression that matches the time information from the dumpstate line at the start of a bug report.
+	// DumpstateRE is a regular expression that matches the time information from the dumpstate
+	// line at the start of a bug report.
 	DumpstateRE = regexp.MustCompile(`==\sdumpstate:\s(?P<timestamp>\d+-\d+-\d+\s\d+:\d+:\d+)`)
 )
 
-// Contents returns a map of the contents of each file from the given bytes slice, with the key being the file name.
+// Contents returns a map of the contents of each file from the given bytes slice, with the key
+// being the file name.
 // Supported file formats are text/plain and application/zip.
 // For zipped files, each file name will be prepended by the zip file's name.
 // An error will be non-nil for processing issues.
@@ -116,7 +155,8 @@ func unzipAndExtract(fname string, b []byte) (map[string][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error copying from ZIP file: %v", err)
 		}
-		// Don't recursively extract from any sub-ZIP files since we use this to also extract .jar files for Closure.
+		// Don't recursively extract from any sub-ZIP files since we use this to also
+		// extract .jar files for Closure.
 		files[fname+"~"+f.Name] = zc.Bytes()
 	}
 	return files, nil
@@ -135,8 +175,15 @@ type MetaInfo struct {
 type SensorInfo struct {
 	Name, Type      string
 	Version, Number int32
-	TotalTimeMs     int64 // time.Duration in Golang is converted to nanoseconds in JS, so using int64 and naming convention to be clear in$
-	Count           float32
+	// time.Duration in Golang is converted to nanoseconds in JS,
+	// so using int64 and naming convention to be clear in$
+	TotalTimeMs        int64
+	Count              float32
+	RequestMode        string
+	MaxDelay, MinDelay int32
+	Batch              bool
+	Max, Reserved      int32
+	WakeUp             bool
 }
 
 // ParseMetaInfo extracts the device ID, build fingerprint and model name from the bug report.
@@ -184,15 +231,17 @@ func ParseMetaInfo(input string) (*MetaInfo, error) {
 	}, err
 }
 
-// extractSensorInfo extracts device sensor information found in the sensorservice dump of a bug report.
+// extractSensorInfo extracts device sensor information found in the sensorservice dump of a bugreport.
 func extractSensorInfo(input string) (map[int32]SensorInfo, error) {
 	inSSection := false
 	sensors := make(map[int32]SensorInfo)
+	curNum := int32(-1)
 
 Loop:
 	for _, line := range strings.Split(input, "\n") {
-		if m, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line); m {
-			switch in := result["service"] == "sensorservice"; {
+		m, result := historianutils.SubexpNames(historianutils.ServiceDumpRE, line)
+		if m {
+			switch in := strings.Contains(result["service"], "sensorservice"); {
 			case inSSection && !in: // Just exited the section
 				break Loop
 			case in:
@@ -205,30 +254,173 @@ Loop:
 		if !inSSection {
 			continue
 		}
-		m, result := historianutils.SubexpNames(sensorLineMMinusRE, line)
-		if !m {
-			m, result = historianutils.SubexpNames(sensorLineNPlusRE, line)
-		}
-		if !m {
-			continue
-		}
-		n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
-		if err != nil {
-			return nil, err
-		}
-		v := 0
-		if x := result["versionNumber"]; x != "" {
-			v, err = strconv.Atoi(x)
+		// Each sensor's information is captured by one line from MNC or before.
+		if m, result := historianutils.SubexpNames(sensorLineMMinusRE, line); m {
+			curSensor := SensorInfo{}
+			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 			if err != nil {
 				return nil, err
 			}
+			curSensor.Number = int32(n)
+
+			v, err := strconv.Atoi(result["versionNumber"])
+			if err != nil {
+				return nil, err
+			}
+			curSensor.Version = int32(v)
+
+			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
+			if strings.Contains(result["variableOne"], "minRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = int32(delay)
+				}
+			}
+			if strings.Contains(result["variableTwo"], "maxRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = int32(delay)
+				}
+			}
+
+			wakeup := false
+			if x := result["wakeUp"]; x != "non-wakeUp" {
+				wakeup = true
+			}
+			curSensor.WakeUp = wakeup
+
+			curSensor.Batch = false
+			if x := result["batching"]; x != "no batching" {
+				m, batchingInfo := historianutils.SubexpNames(fifoMaxRE, x)
+				if !m {
+					continue
+				}
+				max, err := strconv.Atoi(batchingInfo["maxNum"])
+				if err != nil {
+					return nil, err
+				}
+				curSensor.Max = int32(max)
+				curSensor.Batch = true
+			}
+
+			curSensor.Name = result["sensorName"]
+			curSensor.Type = result["sensorTypeString"]
+			curSensor.RequestMode = result["requestMode"]
+			sensors[int32(n)] = curSensor
+			continue
 		}
 
-		sensors[int32(n)] = SensorInfo{
-			Name:    result["sensorName"],
-			Number:  int32(n),
-			Type:    result["sensorTypeString"],
-			Version: int32(v),
+		// Each sensor's information needs at least two lines to record from NRD42 and onwards.
+		if inLineOne, result := historianutils.SubexpNames(sensorLineOneRE, line); inLineOne {
+			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+			if err != nil {
+				return nil, err
+			}
+			curNum = int32(n)
+
+			v, err := strconv.Atoi(result["versionNumber"])
+			if err != nil {
+				return nil, err
+			}
+
+			if _, ok := sensors[curNum]; !ok {
+				sensors[curNum] = SensorInfo{}
+			}
+			curSensor := sensors[curNum]
+			curSensor.Name = result["sensorName"]
+			curSensor.Number = curNum
+			curSensor.Type = result["sensorTypeString"]
+			curSensor.Version = int32(v)
+			sensors[curNum] = curSensor
+		} else if inLineTwo, result := historianutils.SubexpNames(sensorLineTwoRE, line); inLineTwo {
+			curSensor := sensors[curNum]
+			curSensor.RequestMode = result["requestMode"]
+
+			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
+			if strings.Contains(result["variableOne"], "minRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableOne"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableOne"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MaxDelay = int32(delay)
+				}
+			}
+			if strings.Contains(result["variableTwo"], "maxRate") {
+				if m, rateValResult := historianutils.SubexpNames(rateRE, result["variableTwo"]); m {
+					rate, err := strconv.ParseFloat(rateValResult["rateVal"], 32)
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = historianutils.RoundFloat(float64(1000000) / rate)
+				}
+			} else {
+				if m, delayValResult := historianutils.SubexpNames(delayRE, result["variableTwo"]); m {
+					delay, err := strconv.Atoi(delayValResult["delayVal"])
+					if err != nil {
+						return nil, err
+					}
+					curSensor.MinDelay = int32(delay)
+				}
+			}
+
+			wakeup := false
+			if x := result["wakeUp"]; x != "non-wakeUp" {
+				wakeup = true
+			}
+			curSensor.WakeUp = wakeup
+
+			if x := result["batching"]; x != "no batching" {
+				m, batchingInfo := historianutils.SubexpNames(BatchingDataRE, x)
+				if !m {
+					continue
+				}
+				max, err := strconv.Atoi(batchingInfo["maxNum"])
+				if err != nil {
+					return nil, err
+				}
+				reserved, err := strconv.Atoi(batchingInfo["reservedNum"])
+				if err != nil {
+					return nil, err
+				}
+				curSensor.Batch = true
+				curSensor.Max = int32(max)
+				curSensor.Reserved = int32(reserved)
+			}
+			sensors[curNum] = curSensor
+			curNum = int32(-1)
+		} else {
+			continue
 		}
 	}
 
@@ -311,7 +503,8 @@ func ExtractPIDMappings(contents string) (map[string][]AppInfo, []string) {
 	return mapping, warnings
 }
 
-// TimeStampToMs converts a timestamp in the TimeLayout format, combined with the fraction of a second, to a unix ms timestamp based on the location.
+// TimeStampToMs converts a timestamp in the TimeLayout format, combined with the fraction of
+// a second, to a unix ms timestamp based on the location.
 func TimeStampToMs(timestamp, remainder string, loc *time.Location) (int64, error) {
 	if loc == nil {
 		return 0, errors.New("missing location")
@@ -320,7 +513,8 @@ func TimeStampToMs(timestamp, remainder string, loc *time.Location) (int64, erro
 	if err != nil {
 		return 0, err
 	}
-	// The remainder represents the fraction of a second. e.g. timestamp 2015-05-28 19:50:27.123456 has remainder 123456.
+	// The remainder represents the fraction of a second.
+	// e.g. timestamp 2015-05-28 19:50:27.123456 has remainder 123456.
 	ms, err := SecFractionAsMs(remainder)
 	if err != nil {
 		return 0, err

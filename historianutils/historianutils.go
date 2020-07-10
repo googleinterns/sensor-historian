@@ -1,4 +1,4 @@
-// Copyright 2016 Google LLC. All Rights Reserved.
+// Copyright 2016-2020 Google LLC. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"math"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -29,10 +30,14 @@ import (
 
 var (
 	// ServiceDumpRE is a regular expression to match the beginning of a service dump.
-	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>\S+):`)
+	// Note that the string obatined by service may also include tags like CRITICAL or HIGH.
+	// It is recommended to do substring check in order to match the desired service, rather than
+	// use direct string comparison.
+	ServiceDumpRE = regexp.MustCompile(`^DUMP\s+OF\s+SERVICE\s+(?P<service>.*):`)
 
 	// piiEmailRE is a regular expression to match any PII string of the form abc@xxx.yyy.
-	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` + `@` + `(?P<suffix>\S+\.\S+)`)
+	piiEmailRE = regexp.MustCompile(`(?P<prefix>\S+/)?` + `(?P<account>\S+)` +
+		`@` + `(?P<suffix>\S+\.\S+)`)
 
 	// piiSyncRE is a regular expression to match any PII string of the form *sync*/blah/blah/pii
 	piiSyncRE = regexp.MustCompile(`(?P<prefix>\*sync\*/\S+/)(?P<account>\S+)`)
@@ -42,7 +47,7 @@ var (
 // From:
 //     com.google.android.apps.plus.content.EsProvider/com.google/john.doe@gmail.com/extra
 //     or
-//     *sync*/com.app.android.conversations/com.app.android.account/Mr. Noogler
+//     *sync*/com.app.andrsoid.conversations/com.app.android.account/Mr. Noogler
 // To:
 //     com.google.android.apps.plus.content.EsProvider/com.google/XXX@gmail.com/extra
 //     or
@@ -105,8 +110,14 @@ func MaxInt64(a int64, b int64) int64 {
 	return b
 }
 
+// RoundFloat returns the closest integer to the given float number.
+func RoundFloat(val float64) int32 {
+	return int32(math.Round(val))
+}
+
 // ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
-// This is the same as Golang's time.ParseDuration, but also handles days. Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
+// This is the same as Golang's time.ParseDuration, but also handles days.
+// Assumes days are 24 hours, which is not exact but usually good enough for what we care about.
 func ParseDurationWithDays(input string) (int64, error) {
 	if input == "" {
 		return 0, errors.New("cannot parse duration from empty string")
