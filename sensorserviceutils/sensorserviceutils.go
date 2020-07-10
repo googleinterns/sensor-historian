@@ -14,6 +14,7 @@
 
 // Package sensorserviceutils is a library of common functions for
 // parsing sensorservice dump.
+// The feature is only available for Android version Q and onwards.
 package sensorserviceutils
 
 import (
@@ -28,7 +29,6 @@ import (
 	"github.com/googleinterns/sensor-historian/csv"
 	"github.com/googleinterns/sensor-historian/historianutils"
 	acpb "github.com/googleinterns/sensor-historian/pb/activeconnection_proto"
-	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 var (
@@ -203,7 +203,7 @@ func (p *parser) valid() bool {
 // Errors encountered during parsing and potential errors for sensor activities
 // will be collected into an errors slice.
 // The parser will continue parsing remaining events.
-func Parse(f string, meta *bugreportutils.MetaInfo, pkgInfos []*usagepb.PackageInfo) OutputData {
+func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
 		return OutputData{"", nil, nil, []error{err}}
@@ -232,16 +232,12 @@ func Parse(f string, meta *bugreportutils.MetaInfo, pkgInfos []*usagepb.PackageI
 		l := p.line() // Read the current line and advance the line position.
 		// Parse active connection information.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
-			if err := p.extractActiveConnInfo(); err != nil {
-				p.parsingErrs = append(p.parsingErrs, err)
-			}
+			p.extractActiveConnInfo()
 			continue
 		}
 		// Parse registration history information
-		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
-			if err := p.extractRegistrationHistory(pkgInfos); err != nil {
-				p.parsingErrs = append(p.parsingErrs, err)
-			}
+		if m, _ := historianutils.SubexpNames(removeRegistrationRE, l); m {
+			p.extractRegistrationHistory()
 			continue
 		}
 	}
@@ -250,7 +246,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo, pkgInfos []*usagepb.PackageI
 
 // extractActiveConnInfo extracts active connections information found in
 // the sensorservice dump of a bugreport.
-func (p parser) extractActiveConnInfo() error {
+func (p parser) extractActiveConnInfo() {
 	curConnNum := int32(-1)
 	// connections is a map from active connection number to
 	// information for the relevant connection.
@@ -340,8 +336,6 @@ func (p parser) extractActiveConnInfo() error {
 		identifier := fmt.Sprintf("%d,%s", conn.SensorNumber, conn.PackageName)
 		p.activeConns[identifier] = conn
 	}
-
-	return nil
 }
 
 // createActiveConnPBList creates a list of active connection information
@@ -356,7 +350,7 @@ func (p *parser) createActiveConnPBList() []*acpb.ActiveConn {
 
 // extractRegistrationHistory extracts all previous registration information found
 // in the sensorservice dump of a bug report.
-func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) error {
+func (p *parser) extractRegistrationHistory() {
 	for p.valid() {
 		l := p.line()
 
@@ -369,7 +363,7 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			result = match
 		} else {
 			// Reach the end of the previous registration section.
-			return nil
+			return
 		}
 
 		// Get the timestamp of the record.
@@ -442,6 +436,7 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			}
 			value = fmt.Sprintf("%d,%d,%d,%s, %d,%d",
 				sensorNumber, pid, uid, packageName, samplingPeriod, batchingPeriod)
+
 			_, exist := p.history[identifier]
 			if !exist {
 				// If there is no history of removing a subscription,
@@ -464,29 +459,42 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 							packageName, sensorNumber))
 				}
 			} else {
-				//make an event!
+				// A removal statement for the subscription event is seen.
+				// Record this subscription event.
 				eventInfo := p.history[identifier]
-				eventInfo.StartMs = timestamp
-				eventInfo.SamplingPeriod = int32(samplingPeriod)
-				eventInfo.BatchingPeroid = int32(batchingPeriod)
-				entry := csv.Entry{
-					Desc:       sensorRegisDesc,
-					Start:      eventInfo.StartMs,
-					Type:       activeConnDesc,
-					Identifier: identifier,
-					Value:      value,
+				if eventInfo.StartMs != -1 {
+					p.sensorErrs = append(p.sensorErrs,
+						fmt.Errorf("pkg=%s: this app has requested sensor No.%d multiple times",
+							packageName, sensorNumber))
+				} else {
+					eventInfo.StartMs = timestamp
+					eventInfo.SamplingPeriod = int32(samplingPeriod)
+					eventInfo.BatchingPeroid = int32(batchingPeriod)
+					p.csvState.Print(sensorRegisDesc, "string",
+						timestamp, eventInfo.EndMs, value, "")
+					delete(p.history, identifier)
 				}
-				p.csvState.StartEvent(entry)
-				p.csvState.EndEvent(sensorRegisDesc, identifier, eventInfo.EndMs)
-				delete(p.history, identifier)
 			}
 		} else {
-			// The history vairable has an corresponding event only if
-			// the package has unsubscribed the sensor.
-			if _, exist := p.history[identifier]; exist {
-				p.sensorErrs = append(p.sensorErrs,
-					fmt.Errorf("pkg=%s: this app unsubscribed sensor No.%d twice without subscribing it",
-						packageName, sensorNumber))
+			if event, exist := p.history[identifier]; exist {
+				if event.StartMs == -1 {
+					p.sensorErrs = append(p.sensorErrs,
+						fmt.Errorf("pkg=%s: this app unsubscribed sensor No.%d twice without subscribing it",
+							packageName, sensorNumber))
+				} else if event.StartMs < timestamp {
+					p.sensorErrs = append(p.sensorErrs,
+						fmt.Errorf("pkg=%s: this app unsubscribed sensor No.%d twice without subscribing it",
+							packageName, sensorNumber))
+				} else {
+					// The previous registration event is correct, move on to the current event.
+					eventInfo := &SubscriptionInfo{
+						StartMs:      -1,
+						EndMs:        timestamp,
+						SensorNumber: sensorNumber,
+						PackageName:  packageName,
+					}
+					p.history[identifier] = eventInfo
+				}
 			} else {
 				eventInfo := &SubscriptionInfo{
 					StartMs:      -1,
@@ -498,18 +506,20 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			}
 		}
 	}
-	return nil
+	return
 }
 
-// All the following functions are directly copied from the activity.go file
+// This function is directly copied from the activity.go file.
 func validMonth(m int) bool {
 	return m >= int(time.January) && m <= int(time.December)
 }
 
-// This function is directly copied from the activity.go file
-// fullTimestamp constructs the unix ms timestamp from the given date and time information.
-// Since previous registration events have no corresponding year, we reconstruct the full timestamp
-// using the stored reference year ands month extracted from the dumpstate line of the bug report.
+// This function is directly copied from the activity.go file.
+// fullTimestamp constructs the unix ms timestamp from the given date and
+// time information.
+// Since previous registration events have no corresponding year,
+// we reconstruct the full timestamp using the stored reference year and
+// month extracted from the dumpstate line of the bug report.
 func (p *parser) fullTimestamp(month, day, partialTimestamp string) (int64, error) {
 	remainder := "000"
 	parsedMonth, err := strconv.Atoi(month)
@@ -524,25 +534,31 @@ func (p *parser) fullTimestamp(month, day, partialTimestamp string) (int64, erro
 	// Since events do not have the year and may be out of order, we guess the
 	// year based on the month the event occurred and the reference month.
 	//
-	// If the event's month was greater than the reference month by a lot, the event
-	// is assumed to have taken place in the year preceding the reference year since
-	// it doesn't make sense for events to exist so long after the bugreport was taken.
-	// e.g. Reference date: March 2016, Event month: October, year assumed to be 2015.
+	// If the event's month was greater than the reference month by a lot, the
+	// event is assumed to have taken place in the year preceding the reference
+	// year since it doesn't make sense for events to exist so long after
+	// the bugreport was taken.
+	// e.g. Reference date: March 2016,
+	//		Event month: October,
+	// 		year assumed to be 2015.
 	//
-	// If the bug report event log begins near the end of a year, and rolls over to the next year,
-	// the event would have taken place in the year preceding the reference year.
+	// If the bug report event log begins near the end of a year, and rolls over
+	// to the next year, the event would have taken place in the year preceding
+	// the reference year.
 	if int(p.referenceMonth)-parsedMonth < -1 {
 		year--
 		// Some events may still occur after the given reference date,
 		// so we check for a year rollover in the other direction.
-	} else if p.referenceMonth == time.December && time.Month(parsedMonth) == time.January {
+	} else if p.referenceMonth == time.December &&
+		time.Month(parsedMonth) == time.January {
 		year++
 	}
-	return bugreportutils.TimeStampToMs(fmt.Sprintf("%d-%s-%s %s", year, month, day, partialTimestamp),
+	return bugreportutils.TimeStampToMs(
+		fmt.Sprintf("%d-%s-%s %s", year, month, day, partialTimestamp),
 		remainder, p.loc)
 }
 
-// This function is directly copied froms the activity.go file
+// This function is directly copied froms the activity.go file.
 // msToTime converts milliseconds since Unix Epoch to a time.Time object.
 func msToTime(ms int64) time.Time {
 	return time.Unix(0, ms*int64(time.Millisecond))

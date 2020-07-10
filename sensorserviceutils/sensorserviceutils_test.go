@@ -21,11 +21,9 @@ import (
 
 	"github.com/googleinterns/sensor-historian/bugreportutils"
 	acpb "github.com/googleinterns/sensor-historian/pb/activeconnection_proto"
-	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
 
 func TestParse(t *testing.T) {
-	var pkgInfos []*usagepb.PackageInfo
 	meta := &bugreportutils.MetaInfo{
 		DeviceID:   `123456789012345678`,
 		SdkVersion: 21,
@@ -245,7 +243,7 @@ func TestParse(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		OutputData := Parse(test.finput, meta, pkgInfos)
+		OutputData := Parse(test.finput, meta)
 		if OutputData.ParsingErrs != nil {
 			t.Errorf("%v: error: %q", test.name, OutputData.ParsingErrs)
 		}
