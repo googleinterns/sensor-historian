@@ -454,17 +454,18 @@ func (p *parser) extractRegistrationHistory() {
 					}
 					p.history[identifier] = eventInfo
 				} else {
-					p.parsingErrs = append(p.parsingErrs,
+					p.sensorErrs = append(p.sensorErrs,
 						fmt.Errorf("pkg=%s: this app has a lingering subscription to sensor No.%d",
 							packageName, sensorNumber))
 				}
 			} else {
 				// A removal statement for the subscription event is seen.
-				// Record this subscription event.
 				eventInfo := p.history[identifier]
 				if eventInfo.StartMs != -1 {
+					// The removal statement seen before has paired up with an
+					// activated statement.
 					p.sensorErrs = append(p.sensorErrs,
-						fmt.Errorf("pkg=%s: this app has requested sensor No.%d multiple times",
+						fmt.Errorf("[Multiple Activation]:pkg=%s, sensor No.%d multiple times",
 							packageName, sensorNumber))
 				} else {
 					eventInfo.StartMs = timestamp
