@@ -244,8 +244,8 @@ func TestParse(t *testing.T) {
 	}
 	for _, test := range tests {
 		OutputData := Parse(test.finput, meta)
-		if OutputData.Errs != nil {
-			t.Errorf("%v: error: %q", test.name, OutputData.Errs)
+		if OutputData.ParsingErrs != nil {
+			t.Errorf("%v: error: %q", test.name, OutputData.ParsingErrs)
 		}
 		if !reflect.DeepEqual(OutputData.ActiveConns, test.wantActiveConn) {
 			t.Errorf("%v:\n  got : %v\n  want: %v", test.name, OutputData.ActiveConns, test.wantActiveConn)
