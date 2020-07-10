@@ -105,7 +105,7 @@ type OutputData struct {
 }
 
 // SubscriptionInfo contains information about one subscription event of a sensor to an application.
-// For NRD42 and onwards Android versions: easch subscription event is captured by the + statement
+// For NRD42 and onwards Android versions: each subscription event is captured by the + statement
 // that adds the subscription and the - statement that removes the subscription .
 // For MNC or before: each subscription event is captured by the activated/de-activated statments.
 type SubscriptionInfo struct {
@@ -143,8 +143,9 @@ type parser struct {
 	sensors map[int32]bugreportutils.SensorInfo
 	// activeConns is a map from the active connection number to the corresponding connection info.
 	activeConns map[int32]*acpb.ActiveConn
-	// activeSensors is a map from sensor number to a map from UID to the active connection number.
-	activeSensors map[int32]map[int32]int32
+	// activeSensors is a map from sensor number to
+	// a map from packageName to the active connection number.
+	activeSensors map[int32]map[string]int32
 	// historyByUID is a map from a key to SubscriptionInfo.
 	// Note that the key is a string formed by concatenating sensor number and package name.
 	history map[string]*SubscriptionInfo
@@ -211,7 +212,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		csvState:       csv.NewState(buf, true),
 		lines:          strings.Split(f, "\n"),
 		activeConns:    make(map[int32]*acpb.ActiveConn),
-		activeSensors:  make(map[int32]map[int32]int32),
+		activeSensors:  make(map[int32]map[string]int32),
 		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
@@ -294,17 +295,17 @@ func (p parser) extractActiveConnInfo() error {
 			} else if lineFour, result := historianutils.SubexpNames(connLineFourRE, line); lineFour {
 				sensorNumber, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 				if err != nil {
-					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse sensor handle %v:%v",
+					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse sensor No.%v:%v",
 						curConnNum, result["sensorNumber"], err))
 					continue
 				}
 				sensor := int32(sensorNumber)
 				p.activeConns[curConnNum].SensorNumber = sensor
-				uid := p.activeConns[curConnNum].UID
+				PackageName := p.activeConns[curConnNum].PackageName
 				if p.activeSensors[sensor] == nil {
-					p.activeSensors[sensor] = make(map[int32]int32)
+					p.activeSensors[sensor] = make(map[string]int32)
 				}
-				p.activeSensors[sensor][uid] = curConnNum
+				p.activeSensors[sensor][PackageName] = curConnNum
 				pendingFlush, err := strconv.Atoi(result["pendingFlush"])
 				if err != nil {
 					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse pendingFlush %v:%v",
@@ -375,14 +376,16 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 		sensorNumber := int32(handle)
 		_, exist := p.sensors[sensorNumber]
 		if !exist {
-			p.errs = append(p.errs, fmt.Errorf("sensor=%d: invalid subscription for an non-existing sensor",
+			p.errs = append(p.errs, fmt.Errorf("sensor No.%d: invalid subscription for an non-existing sensor",
 				sensorNumber))
 			continue
 		}
 		packageName := result["packageName"]
 		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+
 		var value string
 		if isAdd {
+			// Activated statements have information for sampling and batching peroid.
 			samplingPeriod, err := strconv.Atoi(result["samplingPeriod"])
 			if err != nil {
 				p.errs = append(p.errs, fmt.Errorf("error parsing samplingPeriod %v for line %v: %v",
@@ -397,17 +400,49 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			}
 			value = fmt.Sprintf("%d,%d,%d,%s",
 				sensorNumber, samplingPeriod, batchingPeriod, packageName)
-
-			// If there is no history of removing a subscription, the subscription can still be active.
-
+			_, exist := p.history[identifier]
+			if !exist {
+				// If there is no history of removing a subscription, the subscription has to be active.
+				if _, isActive := p.activeSensors[sensorNumber][identifier]; isActive {
+					//recordActiveConnection!
+					eventInfo := &SubscriptionInfo{
+						StartMs:        timestamp,
+						SensorNumber:   sensorNumber,
+						PackageName:    packageName,
+						SamplingPeriod: int32(samplingPeriod),
+						BatchingPeroid: int32(batchingPeriod),
+					}
+					p.history[identifier] = eventInfo
+				} else {
+					p.errs = append(p.errs,
+						fmt.Errorf("pkg=%s: this app has a lingering subscription to sensor No.%d",
+							packageName, sensorNumber))
+				}
+			} else {
+				//make an event!
+				eventInfo := p.history[identifier]
+				eventInfo.StartMs = timestamp
+				eventInfo.SamplingPeriod = int32(samplingPeriod)
+				eventInfo.BatchingPeroid = int32(batchingPeriod)
+				entry := csv.Entry{
+					Desc:       sensorRegisDesc,
+					Start:      eventInfo.StartMs,
+					Type:       activeConnDesc,
+					Identifier: identifier,
+					Value:      value,
+				}
+				p.csvState.StartEvent(entry)
+				p.csvState.EndEvent(sensorRegisDesc, identifier, eventInfo.EndMs)
+				delete(p.history, identifier)
+			}
 		} else {
 			// The history vairable only has an event if the package has unsubscribed the sensor.
 			if _, exist := p.history[identifier]; exist {
 				p.errs = append(p.errs,
-					fmt.Errorf("pkg=%s: this app unsubscribed sensor %d twice without subscribing it",
+					fmt.Errorf("pkg=%s: this app unsubscribed sensor No.%d twice without subscribing it",
 						packageName, sensorNumber))
 			} else {
-				var eventInfo = &SubscriptionInfo{
+				eventInfo := &SubscriptionInfo{
 					StartMs:      -1,
 					EndMs:        timestamp,
 					SensorNumber: sensorNumber,
