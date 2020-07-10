@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	// Each of the connectionLineXRE is a regular expression to match the X line of
+	// Each of the connLineXRE is a regular expression to match the X line of
 	// connection information in the sensorservice dump in the bugreport across all version.
 	connLineOneRE   = regexp.MustCompile(`\s*Connection\s+Number:\s*` + `(?P<connNum>\d+)`)
 	connLineTwoRE   = regexp.MustCompile(`\s*Operating\s+Mode: (?P<connMode>[^(]+)` + `\s*`)
@@ -100,7 +100,8 @@ const (
 type OutputData struct {
 	CSV         string
 	ActiveConns []*acpb.ActiveConn
-	Errs        []error
+	ParsingErrs []error
+	SensorErrs  []error
 }
 
 // SubscriptionInfo contains information about one subscription event of a sensor to an application.
@@ -120,12 +121,15 @@ type parser struct {
 	// Previous Registration lines don't contain a year in the date string, so we use this
 	// to reconstruct the full timestamp.
 	referenceYear int
+
 	// referenceMonth is the month extracted from the dumpstate line in a bugreport.
 	// Since a bugreport may span over a year boundary, we use the month to check whether the
 	// year for the event needs to be decremented or incremented.
 	referenceMonth time.Month
+
 	// referenceDay is the month extracted from the dumpstate line in a bugreport.
 	referenceDay int
+
 	// loc is the location parsed from timezone information in the bugreport.
 	// The previous registration is in the user's local timezone which we need to convert to UTC time.
 	loc *time.Location
@@ -133,20 +137,23 @@ type parser struct {
 	lines []string
 	idx   int
 
-	buf      *bytes.Buffer
-	csvState *csv.State
-	errs     []error
+	buf         *bytes.Buffer
+	csvState    *csv.State
+	parsingErrs []error
+	sensorErrs  []error
 
-	// sensors is a map from sensor number to sensorInfo, it directly adoptes the Sensors map
-	// define in the bugreportutils packaged.
+	// sensors is a map from sensor number to the relevant sensor's information.
 	sensors map[int32]bugreportutils.SensorInfo
-	// activeConns is a map from the active connection number to the corresponding connection info.
-	activeConns map[int32]*acpb.ActiveConn
-	// activeSensors is a map from sensor number to
-	// a map from packageName to the active connection number.
-	activeSensors map[int32]map[string]int32
-	// historyByUID is a map from a key to SubscriptionInfo.
-	// Note that the key is a string formed by concatenating sensor number and package name.
+
+	// activeConns is a map from an identifier to the relevant connection information.
+	// If a sensor is actively subscribed by a package when the bugreport is generated, the relevant
+	// connection information can be obtained using the identifier formed by concatenating
+	// sensor number and name of the package.
+	activeConns map[string]*acpb.ActiveConn
+
+	// history is a map from an identifier to an sensor subscription event.
+	// Note that the identifier is a string formed by concatenating sensor number and name of
+	// the package that subscribes the sensor.
 	history map[string]*SubscriptionInfo
 }
 
@@ -193,12 +200,12 @@ func (p *parser) valid() bool {
 func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
-		return OutputData{"", nil, []error{err}}
+		return OutputData{"", nil, nil, []error{err}}
 	}
 	// Extract the year and month from the bugreport dumpstate line.
 	d, err := bugreportutils.DumpState(f)
 	if err != nil {
-		return OutputData{"", nil,
+		return OutputData{"", nil, nil,
 			[]error{fmt.Errorf("could not find dumpstate information in the bugreport: %v", err)}}
 	}
 	buf := new(bytes.Buffer)
@@ -210,8 +217,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		buf:            buf,
 		csvState:       csv.NewState(buf, true),
 		lines:          strings.Split(f, "\n"),
-		activeConns:    make(map[int32]*acpb.ActiveConn),
-		activeSensors:  make(map[int32]map[string]int32),
+		activeConns:    make(map[string]*acpb.ActiveConn),
 		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
@@ -221,51 +227,47 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		// Active connection parsing.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
 			if err := p.extractActiveConnInfo(); err != nil {
-				p.errs = append(p.errs, err)
+				p.parsingErrs = append(p.parsingErrs, err)
 			}
 			continue
 		}
-		// Previous registration parising.
-		// if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
-		// 	if err := p.extractRegistrationHistory(); err != nil {
-		// 		p.errs = append(p.errs, err)
-		// 	}
-		// 	continue
-		// }
 	}
-	return OutputData{"", p.createActiveConnPB(), p.errs}
+	return OutputData{"", p.createActiveConnPBList(), p.sensorErrs, p.parsingErrs}
 }
 
 // extractActiveConnInfo extracts active connections information found in the sensorservice dump of
 // a bugreport.
 func (p parser) extractActiveConnInfo() error {
 	curConnNum := int32(-1)
+	// connections is a map from active connection number to information for the relevant connection.
+	connections := make(map[int32]*acpb.ActiveConn)
+
 	for p.valid() {
 		line := p.line()
 		// Stop when reaching the section about direct connection.
 		if inDirectConn, _ := historianutils.SubexpNames(directConnRE, line); inDirectConn {
 			p.prevline()
-			return nil
+			break
 		}
 		// In Android MNC or before, the direct connesction section may not exist if there is no
 		// direct connection. So the section stops when reaching the previous registration section.
 		if inPrevRegis, _ := historianutils.SubexpNames(prevRegistrationRE, line); inPrevRegis {
 			p.prevline()
-			return nil
+			break
 		}
 		// For all Android version: each active connection's information needs four lines to record.
 		if lineOne, result := historianutils.SubexpNames(connLineOneRE, line); lineOne {
 			connNum, err := strconv.Atoi(result["connNum"])
 			if err != nil {
-				p.errs = append(p.errs, fmt.Errorf("could not parse connection number %v:%v",
-					result["connNum"], err))
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("could not parse connection number %v:%v", result["connNum"], err))
 				continue
 			}
 			// Since proto buff restricts that field numbers must be positive integers,
-			// we will add to all the connection number and will not use zero-indexing.
+			// we will not use zero-indexing by adding 1 to all the connection number.
 			curConnNum = int32(connNum) + 1
-			if _, ok := p.activeConns[curConnNum]; !ok {
-				p.activeConns[curConnNum] = &acpb.ActiveConn{
+			if _, ok := connections[curConnNum]; !ok {
+				connections[curConnNum] = &acpb.ActiveConn{
 					Number:        curConnNum,
 					UID:           -1,
 					PendingFlush:  -1,
@@ -275,52 +277,58 @@ func (p parser) extractActiveConnInfo() error {
 				}
 			}
 		} else {
-			_, ok := p.activeConns[curConnNum]
+			_, ok := connections[curConnNum]
 			if !ok {
-				p.errs = append(p.errs, fmt.Errorf("no information regarding connection %v", curConnNum))
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("no information regarding connection %v", curConnNum))
 				continue
 			}
 			if lineTwo, result := historianutils.SubexpNames(connLineTwoRE, line); lineTwo {
-				p.activeConns[curConnNum].OperatingMode = result["connMode"]
+				connections[curConnNum].OperatingMode = result["connMode"]
 			} else if lineThree, result := historianutils.SubexpNames(connLineThreeRE, line); lineThree {
 				uid, err := strconv.Atoi(result["uid"])
 				if err != nil {
-					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse uid %v:%v",
-						curConnNum, result["uid"], err))
+					p.parsingErrs = append(p.parsingErrs,
+						fmt.Errorf("active connection %d: cannot parse uid %v:%v",
+							curConnNum, result["uid"], err))
 					continue
 				}
-				p.activeConns[curConnNum].UID = int32(uid)
-				p.activeConns[curConnNum].PackageName = result["packageName"]
+				connections[curConnNum].UID = int32(uid)
+				connections[curConnNum].PackageName = result["packageName"]
 			} else if lineFour, result := historianutils.SubexpNames(connLineFourRE, line); lineFour {
 				sensorNumber, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 				if err != nil {
-					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse sensor handle %v:%v",
-						curConnNum, result["sensorNumber"], err))
+					p.parsingErrs = append(p.parsingErrs,
+						fmt.Errorf("active connection %d: cannot parse sensor handle %v:%v",
+							curConnNum, result["sensorNumber"], err))
 					continue
 				}
 				sensor := int32(sensorNumber)
-				p.activeConns[curConnNum].SensorNumber = sensor
-				PackageName := p.activeConns[curConnNum].PackageName
-				if p.activeSensors[sensor] == nil {
-					p.activeSensors[sensor] = make(map[string]int32)
-				}
-				p.activeSensors[sensor][PackageName] = curConnNum
+				connections[curConnNum].SensorNumber = sensor
 				pendingFlush, err := strconv.Atoi(result["pendingFlush"])
 				if err != nil {
-					p.errs = append(p.errs, fmt.Errorf("active connection %d: cannot parse pendingFlush %v:%v",
-						curConnNum, result["uid"], err))
+					p.parsingErrs = append(p.parsingErrs,
+						fmt.Errorf("active connection %d: cannot parse pendingFlush %v:%v",
+							curConnNum, result["uid"], err))
 					continue
 				}
-				p.activeConns[curConnNum].PendingFlush = int32(pendingFlush)
+				connections[curConnNum].PendingFlush = int32(pendingFlush)
 			}
 		}
 	}
+
+	// Build the new map that uses identifier to look up relevant active connection information.
+	for _, conn := range connections {
+		identifier := fmt.Sprintf("%d,%s", conn.SensorNumber, conn.PackageName)
+		p.activeConns[identifier] = conn
+	}
+
 	return nil
 }
 
-// createActiveConnPB create a list of active connection information based on the map built while
+// createActiveConnPBList creates a list of active connection information based on the map built while
 // parsing sensorservice dump.
-func (p *parser) createActiveConnPB() []*acpb.ActiveConn {
+func (p *parser) createActiveConnPBList() []*acpb.ActiveConn {
 	var activeConnections []*acpb.ActiveConn
 	for _, conn := range p.activeConns {
 		activeConnections = append(activeConnections, conn)
