@@ -105,7 +105,7 @@ type OutputData struct {
 }
 
 // SubscriptionInfo contains information about one subscription event of a sensor to an application.
-// For NRD42 and onwards Android versions: easch subscription event is captured by the + statement
+// For NRD42 and onwards Android versions: each subscription event is captured by the + statement
 // that adds the subscription and the - statement that removes the subscription .
 // For MNC or before: each subscription event is captured by the activated/de-activated statments.
 type SubscriptionInfo struct {
