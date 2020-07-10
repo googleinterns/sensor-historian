@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package sensorserviceutils is a library of common sensorservice dump parsing functions.
+// Package sensorserviceutils is a library of common functions for
+// parsing sensorservice dump.
 package sensorserviceutils
 
 import (
@@ -32,43 +33,53 @@ import (
 
 var (
 	// Each of the connLineXRE is a regular expression to match the X line of
-	// connection information in the sensorservice dump in the bugreport across all version.
-	connLineOneRE   = regexp.MustCompile(`\s*Connection\s+Number:\s*` + `(?P<connNum>\d+)`)
-	connLineTwoRE   = regexp.MustCompile(`\s*Operating\s+Mode: (?P<connMode>[^(]+)` + `\s*`)
-	connLineThreeRE = regexp.MustCompile(`\s*(?P<packageName>[^(]+)` + `\s*\|\s*` +
-		`WakeLockRefCount\s*(?P<wakeLockRefCount>\d+)` + `\s*\|\s*` + `uid\s*(?P<uid>\d+)`)
-	connLineFourRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*\|\s*` +
-		`status:\s*(?P<status>[^(]+)` + `\s*\|\s*` + `pending\s*flush\s*events\s*` +
-		`(?P<pendingFlush>\d+)`)
+	// connection information in the sensorservice dump in the bugreport.
+	// Active connection information has the same format for all Android versions.
+	connLineOneRE = regexp.MustCompile(`\s*Connection\s+Number:\s*(?P<connNum>\d+)`)
+	connLineTwoRE = regexp.MustCompile(`\s*Operating\s+Mode:` +
+		`(?P<connMode>[^(]+)` + `\s*`)
+	connLineThreeRE = regexp.MustCompile(`\s*(?P<packageName>[^(]+)` +
+		`\s*\|\s*` + `WakeLockRefCount\s*(?P<wakeLockRefCount>\d+)` +
+		`\s*\|\s*` + `uid\s*(?P<uid>\d+)`)
+	connLineFourRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` +
+		`\s*\|\s*` + `status:\s*(?P<status>[^(]+)` + `\s*\|\s*` +
+		`pending\s*flush\s*events\s*` + `(?P<pendingFlush>\d+)`)
 
-	// activeConnRE is a regular expression to match the section for active connections in the
-	// sensorservice dump in the bugreport across all version.
+	// activeConnRE is a regular expression to match the section for active
+	// connections in the sensorservice dump in the bugreport
+	// for all Android version.
 	activeConnRE = regexp.MustCompile(`\s*active\s*connections\s*`)
 
-	// directConnRE is a regular expression to match the section for direct connections in the
-	// sensorservice dump in the bugreport across all version.
+	// directConnRE is a regular expression to match the section for direct
+	// connections in the sensorservice dump in the bugreport
+	// for all Android version.
 	directConnRE = regexp.MustCompile(`\s*direct\s*connections\s*`)
 
-	// prevRegistrationRE is a regular expression to match the section for previous connections i
-	// in the sensorservice dump in the bugreport across all version.
-	prevRegistrationRE = regexp.MustCompile(`Previous` + `\s*` + `Registrations:`)
+	// prevRegistrationRE is a regular expression to match the section for
+	// previous connections in the sensorservice dump in the bugreport
+	// for all Android version.
+	prevRegistrationRE = regexp.MustCompile(`Previous\s*Registrations:`)
 
-	// addRegistrationRE is a regular expression to match the log that adds subscription in the
-	// sensorservice dump in the bugreport starting from NRD42 and onwards.
-	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\+` +
-		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
-		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)` +
-		`\s*samplingPeriod=\s*` + `(?P<samplingPeriod>\d+)us` + `\s*batchingPeriod=\s*` +
+	// addRegistrationRE is a regular expression to match the log that adds
+	// subscription in the sensorservice dump in the bugreport
+	// for Android starting from NRD42 and onwards.
+	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)\s*` +
+		`\+` + `\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` +
+		`(?P<pid>\d+)` + `\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` +
+		`(?P<packageName>[^(]+)` + `\s*samplingPeriod=\s*` +
+		`(?P<samplingPeriod>\d+)us` + `\s*batchingPeriod=\s*` +
 		`(?P<batchingPeriod>\d+)us`)
 
-	// removeRegistrationRE is a regular expression to match the log that removes subscription in
-	// the sensorservice dump in the bugreport starting from NRD42 and onwards.
-	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` + `\s*` + `\-` +
-		`\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` + `(?P<pid>\d+)` +
-		`\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` + `(?P<packageName>[^(]+)`)
+	// removeRegistrationRE is a regular expression to match the log that
+	// removes subscription in the sensorservice dump in the bugreport
+	// for Android starting from NRD42 and onwards.
+	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` +
+		`\s*` + `\-` + `\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` +
+		`(?P<pid>\d+)` + `\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` +
+		`(?P<packageName>[^(]+)`)
 
-	// timeLayoutRE is a regular expression to match the timestamp with dates that may probably
-	// show up in the bugreport.
+	// timeLayoutRE is a regular expression to match the timestamp with dates
+	// that may show up in the bugreport.
 	timeLayoutRE = regexp.MustCompile(`^(?P<month>\d+)-(?P<day>\d+)`)
 )
 
@@ -83,8 +94,8 @@ const (
 	unknownTime = -1
 )
 
-// OutputData contains information for active connection and previous registration history collected
-// in the sensorservice dump.
+// OutputData contains information for active connection and previous
+// registration history collected in the sensorservice dump.
 type OutputData struct {
 	CSV         string
 	ActiveConns []*acpb.ActiveConn
@@ -92,13 +103,17 @@ type OutputData struct {
 	SensorErrs  []error
 }
 
-// SubscriptionInfo contains information about one subscription event of a sensor to an application.
-// For NRD42 and onwards Android versions: each subscription event is captured by the + statement
-// that adds the subscription and the - statement that removes the subscription .
-// For MNC or before: each subscription event is captured by the activated/de-activated statments.
+// SubscriptionInfo contains information about one subscription event of
+// a sensor to an application.
+// For NRD42 and onwards Android versions: each subscription event is captured
+// by the + statement that adds the subscription and the - statement that
+// removes the subscription .
+// For MNC or before: each subscription event is captured by
+// activated/de-activated statments.
 type SubscriptionInfo struct {
 	StartMs, EndMs int64
 	SensorNumber   int32
+	UID, PID       int32
 	PackageName    string
 	SamplingPeriod int32
 	BatchingPeroid int32
@@ -106,20 +121,21 @@ type SubscriptionInfo struct {
 
 type parser struct {
 	// referenceYear is the year extracted from the dumpstate line in a bugreport.
-	// Previous Registration lines don't contain a year in the date string, so we use this
-	// to reconstruct the full timestamp.
+	// Previous Registration lines don't contain a year in the date string,
+	// so we use this to reconstruct the full timestamp.
 	referenceYear int
 
 	// referenceMonth is the month extracted from the dumpstate line in a bugreport.
-	// Since a bugreport may span over a year boundary, we use the month to check whether the
-	// year for the event needs to be decremented or incremented.
+	// Since a bugreport may span over a year boundary, we use the month to
+	// check whether the year for the event needs to be decremented or incremented.
 	referenceMonth time.Month
 
 	// referenceDay is the month extracted from the dumpstate line in a bugreport.
 	referenceDay int
 
 	// loc is the location parsed from timezone information in the bugreport.
-	// The previous registration is in the user's local timezone which we need to convert to UTC time.
+	// The previous registration is in the user's local timezone
+	// which we need to convert to UTC time.
 	loc *time.Location
 
 	lines []string
@@ -134,14 +150,14 @@ type parser struct {
 	sensors map[int32]bugreportutils.SensorInfo
 
 	// activeConns is a map from an identifier to the relevant connection information.
-	// If a sensor is actively subscribed by a package when the bugreport is generated, the relevant
-	// connection information can be obtained using the identifier formed by concatenating
-	// sensor number and name of the package.
+	// If a sensor is actively subscribed by a package when the bugreport is
+	// generated, the relevant connection information can be obtained using
+	// an identifier formed by concatenating sensor number and package name.
 	activeConns map[string]*acpb.ActiveConn
 
 	// history is a map from an identifier to an sensor subscription event.
-	// Note that the identifier is a string formed by concatenating sensor number and name of
-	// the package that subscribes the sensor.
+	// Note that the identifier is a string formed by concatenating
+	// sensor number and name of the package that subscribes the sensor.
 	history map[string]*SubscriptionInfo
 }
 
@@ -181,11 +197,13 @@ func (p *parser) valid() bool {
 	return (p.idx < len(p.lines)) && (p.idx >= 0)
 }
 
-// Parse function collects information regarding active connections and records availalbe sensor
-// subscription events in the sensorservice section as CSV entry.
-// Errors encountered during parsing will be collected into an errors slice and
-// will continue parsing remaining events.
-func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
+// Parse function collects information regarding active connections and
+// records availalbe sensor subscription events in the sensorservice section
+// as CSV entry.
+// Errors encountered during parsing and potential errors for sensor activities
+// will be collected into an errors slice.
+// The parser will continue parsing remaining events.
+func Parse(f string, meta *bugreportutils.MetaInfo, pkgInfos []*usagepb.PackageInfo) OutputData {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
 		return OutputData{"", nil, nil, []error{err}}
@@ -212,9 +230,16 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 
 	for p.valid() {
 		l := p.line() // Read the current line and advance the line position.
-		// Active connection parsing.
+		// Parse active connection information.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
 			if err := p.extractActiveConnInfo(); err != nil {
+				p.parsingErrs = append(p.parsingErrs, err)
+			}
+			continue
+		}
+		// Parse registration history information
+		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
+			if err := p.extractRegistrationHistory(pkgInfos); err != nil {
 				p.parsingErrs = append(p.parsingErrs, err)
 			}
 			continue
@@ -223,11 +248,12 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	return OutputData{"", p.createActiveConnPBList(), p.sensorErrs, p.parsingErrs}
 }
 
-// extractActiveConnInfo extracts active connections information found in the sensorservice dump of
-// a bugreport.
+// extractActiveConnInfo extracts active connections information found in
+// the sensorservice dump of a bugreport.
 func (p parser) extractActiveConnInfo() error {
 	curConnNum := int32(-1)
-	// connections is a map from active connection number to information for the relevant connection.
+	// connections is a map from active connection number to
+	// information for the relevant connection.
 	connections := make(map[int32]*acpb.ActiveConn)
 
 	for p.valid() {
@@ -237,13 +263,15 @@ func (p parser) extractActiveConnInfo() error {
 			p.prevline()
 			break
 		}
-		// In Android MNC or before, the direct connesction section may not exist if there is no
-		// direct connection. So the section stops when reaching the previous registration section.
+		// In Android MNC or before, the direct connesction section may not exist
+		// if there is no direct connection.
+		// The section stops when reaching the previous registration section.
 		if inPrevRegis, _ := historianutils.SubexpNames(prevRegistrationRE, line); inPrevRegis {
 			p.prevline()
 			break
 		}
-		// For all Android version: each active connection's information needs four lines to record.
+		// For all Android version: each active connection's information needs
+		// four lines to record.
 		if lineOne, result := historianutils.SubexpNames(connLineOneRE, line); lineOne {
 			connNum, err := strconv.Atoi(result["connNum"])
 			if err != nil {
@@ -251,8 +279,9 @@ func (p parser) extractActiveConnInfo() error {
 					fmt.Errorf("could not parse connection number %v:%v", result["connNum"], err))
 				continue
 			}
-			// Since proto buff restricts that field numbers must be positive integers,
-			// we will not use zero-indexing by adding 1 to all the connection number.
+			// Since proto buff restricts that field numbers must be positive
+			// integers, we will not use zero-indexing by adding 1 to
+			// all connection number.
 			curConnNum = int32(connNum) + 1
 			if _, ok := connections[curConnNum]; !ok {
 				connections[curConnNum] = &acpb.ActiveConn{
@@ -305,7 +334,8 @@ func (p parser) extractActiveConnInfo() error {
 		}
 	}
 
-	// Build the new map that uses identifier to look up relevant active connection information.
+	// Build the new map that uses identifier to look up relevant active
+	// connection information.
 	for _, conn := range connections {
 		identifier := fmt.Sprintf("%d,%s", conn.SensorNumber, conn.PackageName)
 		p.activeConns[identifier] = conn
@@ -314,8 +344,8 @@ func (p parser) extractActiveConnInfo() error {
 	return nil
 }
 
-// createActiveConnPBList creates a list of active connection information based on the map built while
-// parsing sensorservice dump.
+// createActiveConnPBList creates a list of active connection information
+// based on the map built while parsing sensorservice dump.
 func (p *parser) createActiveConnPBList() []*acpb.ActiveConn {
 	var activeConnections []*acpb.ActiveConn
 	for _, conn := range p.activeConns {
@@ -329,6 +359,7 @@ func (p *parser) createActiveConnPBList() []*acpb.ActiveConn {
 func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) error {
 	for p.valid() {
 		l := p.line()
+
 		var result map[string]string
 		isAdd := false
 		if add, match := historianutils.SubexpNames(addRegistrationRE, l); add {
@@ -342,6 +373,7 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 		}
 
 		// Get the timestamp of the record.
+		// Also accomodate the case where the timestamp includes date.
 		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
 		var timestamp int64
 		var timestampErr error
@@ -353,24 +385,42 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			timestamp, timestampErr = p.fullTimestamp(month, day, result["timeStamp"])
 		}
 		if timestampErr != nil {
-			p.parsingErrs = append(p.parsingErrs, fmt.Errorf("error parsing timestamp for line %v: %v", l, timestampErr))
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("error parsing timestamp for line %v: %v", l, timestampErr))
 			continue
 		}
 
+		// All registration history records information for
+		// sensorNumber, pid, uid, and packageName.
 		handle, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 		if err != nil {
-			p.parsingErrs = append(p.parsingErrs, fmt.Errorf("error parsing sensorNumber %v for line %v: %v",
-				result["sensorNumber"], l, err))
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("error parsing sensorNumber %v for line %v: %v",
+					result["sensorNumber"], l, err))
 			continue
 		}
 		sensorNumber := int32(handle)
 		_, exist := p.sensors[sensorNumber]
 		if !exist {
-			p.parsingErrs = append(p.parsingErrs, fmt.Errorf("sensor No.%d: invalid subscription for an non-existing sensor",
-				sensorNumber))
+			p.sensorErrs = append(p.sensorErrs,
+				fmt.Errorf("sensor No.%d: invalid subscription for an non-existing sensor", sensorNumber))
 			continue
 		}
 		packageName := result["packageName"]
+		pid, err := strconv.Atoi(result["pid"])
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("error parsing pid %v for line %v: %v",
+					result["pid"], l, err))
+			continue
+		}
+		uid, err := strconv.Atoi(result["uid"])
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("error parsing uid %v for line %v: %v",
+					result["uid"], l, err))
+			continue
+		}
 		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
 
 		var value string
@@ -378,26 +428,31 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 			// Activated statements have information for sampling and batching peroid.
 			samplingPeriod, err := strconv.Atoi(result["samplingPeriod"])
 			if err != nil {
-				p.parsingErrs = append(p.parsingErrs, fmt.Errorf("error parsing samplingPeriod %v for line %v: %v",
-					result["samplingPeriod"], l, err))
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("error parsing samplingPeriod %v for line %v: %v",
+						result["samplingPeriod"], l, err))
 				continue
 			}
 			batchingPeriod, err := strconv.Atoi(result["batchingPeriod"])
 			if err != nil {
-				p.parsingErrs = append(p.parsingErrs, fmt.Errorf("error parsing batchingPeriod %v for line %v: %v",
-					result["batchingPeriod"], l, err))
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("error parsing batchingPeriod %v for line %v: %v",
+						result["batchingPeriod"], l, err))
 				continue
 			}
-			value = fmt.Sprintf("%d,%d,%d,%s",
-				sensorNumber, samplingPeriod, batchingPeriod, packageName)
+			value = fmt.Sprintf("%d,%d,%d,%s, %d,%d",
+				sensorNumber, pid, uid, packageName, samplingPeriod, batchingPeriod)
 			_, exist := p.history[identifier]
 			if !exist {
-				// If there is no history of removing a subscription, the subscription has to be active.
+				// If there is no history of removing a subscription,
+				// the subscription has to be active.
 				if _, isActive := p.activeConns[identifier]; isActive {
 					//recordActiveConnection!
 					eventInfo := &SubscriptionInfo{
 						StartMs:        timestamp,
 						SensorNumber:   sensorNumber,
+						PID:            int32(pid),
+						UID:            int32(uid),
 						PackageName:    packageName,
 						SamplingPeriod: int32(samplingPeriod),
 						BatchingPeroid: int32(batchingPeriod),
@@ -426,9 +481,10 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 				delete(p.history, identifier)
 			}
 		} else {
-			// The history vairable only has an event if the package has unsubscribed the sensor.
+			// The history vairable has an corresponding event only if
+			// the package has unsubscribed the sensor.
 			if _, exist := p.history[identifier]; exist {
-				p.parsingErrs = append(p.parsingErrs,
+				p.sensorErrs = append(p.sensorErrs,
 					fmt.Errorf("pkg=%s: this app unsubscribed sensor No.%d twice without subscribing it",
 						packageName, sensorNumber))
 			} else {
@@ -445,7 +501,7 @@ func (p *parser) extractRegistrationHistory(pkgInfos []*usagepb.PackageInfo) err
 	return nil
 }
 
-// This function is directly copied from the activity.go file
+// All the following functions are directly copied from the activity.go file
 func validMonth(m int) bool {
 	return m >= int(time.January) && m <= int(time.December)
 }
