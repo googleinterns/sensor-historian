@@ -102,6 +102,7 @@ var (
 )
 
 const (
+	timeFormat      = "15:04:05"
 	sensorRegisDesc = "Sensorservice Registration"
 	activeConnDesc  = "Active Connection"
 	completeStr     = "complete"
@@ -239,24 +240,6 @@ func (p *parser) valid() bool {
 	return (p.idx < len(p.lines)) && (p.idx >= 0)
 }
 
-// getCurrentTime returns a string for the input time in the form of "HH:MM:SS"
-// e.g. "18:06:31" is returned instead of "18:6:31"
-func getCurrentTime(d time.Time) string {
-	hour := strconv.Itoa(d.Hour())
-	min := strconv.Itoa(d.Minute())
-	sec := strconv.Itoa(d.Second())
-	if len(hour) < 2 {
-		hour = fmt.Sprintf("0%s", hour)
-	}
-	if len(min) < 2 {
-		min = fmt.Sprintf("0%s", min)
-	}
-	if len(sec) < 2 {
-		sec = fmt.Sprintf("0%s", sec)
-	}
-	return fmt.Sprintf("%s:%s:%s", hour, min, sec)
-}
-
 // Parse function collects information regarding active connections and
 // records availalbe sensor subscription events in the sensorservice section
 // as CSV entry.
@@ -285,7 +268,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		referenceYear:  d.Year(),
 		referenceMonth: int(d.Month()),
 		referenceDay:   d.Day(),
-		referenceTime:  getCurrentTime(d),
+		referenceTime:  d.Format(timeFormat),
 		loc:            loc,
 		buf:            buf,
 		csvState:       csv.NewState(buf, true),
