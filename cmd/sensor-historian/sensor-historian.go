@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	optimized = flag.Bool("optimized", true, "Whether to output optimized js files. Disable for local debugging.")
+	optimized = flag.Bool("optimized", false, "Whether to output optimized js files. Disable for local debugging.")
 	port      = flag.Int("port", 9999, "service port")
 
 	compiledDir   = flag.String("compiled_dir", "./compiled", "Directory containing compiled js file for Historian v2.")
