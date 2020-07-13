@@ -882,7 +882,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			broadcastsOutput = <-broadcastsCh
 			dmesgOutput = <-dmesgCh
 			wearableOutput = <-wearableCh
-			errs = append(sensorserviceOutput.Errs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
+			errs = append(sensorserviceOutput.ParsingErrs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
 		}
 
 		warnings = append(warnings, activityManagerOutput.Warnings...)
