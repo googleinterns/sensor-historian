@@ -14,12 +14,14 @@
 
 // Package sensorserviceutils is a library of common functions for
 // parsing sensorservice dump.
+// The feature is only available for Android version Q and onwards.
 package sensorserviceutils
 
 import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +45,22 @@ var (
 	connLineFourRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` +
 		`\s*\|\s*` + `status:\s*(?P<status>[^(]+)` + `\s*\|\s*` +
 		`pending\s*flush\s*events\s*` + `(?P<pendingFlush>\d+)`)
+
+	// sensorListRE is a regular expression to match the section for all
+	// sensors' information in the sensorservice dump in the bugreport
+	sensorListRE = regexp.MustCompile(`\s*Sensor\s*List:\s*`)
+
+	// sensorRunningLineRE is a regular expression to match header of
+	// the section for all active sensors' information in the
+	// sensorservice dump in the bugreport.
+	sensorRunningLineRE = regexp.MustCompile(`Total\s*` + `(?P<total>\d+)` +
+		`\s*h/w sensors,\s*` + `(?P<running>\d+)` + `\s*running:`)
+
+	// activeSensorRE is a regular expression to match the line for active
+	// sensor's information in the sensorservice dump in the bugreport.
+	activeSensorRE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)\)` +
+		`.*` + `selected = (?P<samplingPeriod>[0-9]*\.?[0-9]+) ms;` + `.*` +
+		`selected = (?P<batchingPeriod>[0-9]*\.?[0-9]+) ms`)
 
 	// activeConnRE is a regular expression to match the section for active
 	// connections in the sensorservice dump in the bugreport
@@ -79,7 +97,7 @@ var (
 
 	// timeLayoutRE is a regular expression to match the timestamp with dates
 	// that may show up in the bugreport.
-	timeLayoutRE = regexp.MustCompile(`^(?P<month>\d+)-(?P<day>\d+)`)
+	timeLayoutRE = regexp.MustCompile(`^(?P<month>\d+)\-(?P<day>\d+)`)
 )
 
 const (
@@ -88,6 +106,9 @@ const (
 	completeStr     = "complete"
 	activeStr       = "active"
 	errorStr        = "error"
+	parseConnErrStr = "Parse Active Conn"
+	parseRegErrStr  = "Parse Registration"
+	sensorErrStr    = "Subscription Error"
 	// unknownTime is used when the start or end time of an event is unknown.
 	// This is not zero as csv.AddEntryWithOpt ignores events with a zero time.
 	unknownTime = -1
@@ -97,9 +118,17 @@ const (
 // registration history collected in the sensorservice dump.
 type OutputData struct {
 	CSV         string
-	ActiveConns []*acpb.ActiveConn
+	ActiveConns map[int32]*acpb.ActiveConn
 	ParsingErrs []error
 	SensorErrs  []error
+}
+
+// activeSensor contains information about a running sensor. All relevant
+// information comes from the running sensor section in the sensorservice dump.
+type activeSensor struct {
+	sensorNumber   int32
+	samplingPeriod int32
+	batchingPeriod int32
 }
 
 // SubscriptionInfo contains information about one subscription event of
@@ -112,10 +141,10 @@ type OutputData struct {
 type SubscriptionInfo struct {
 	StartMs, EndMs int64
 	SensorNumber   int32
-	UID, PID       int32
+	UID            int32
 	PackageName    string
 	SamplingPeriod int32
-	BatchingPeroid int32
+	BatchingPeriod int32
 }
 
 type parser struct {
@@ -127,10 +156,19 @@ type parser struct {
 	// referenceMonth is the month extracted from the dumpstate line in a bugreport.
 	// Since a bugreport may span over a year boundary, we use the month to
 	// check whether the year for the event needs to be decremented or incremented.
-	referenceMonth time.Month
+	referenceMonth int
 
 	// referenceDay is the month extracted from the dumpstate line in a bugreport.
 	referenceDay int
+
+	// currentTime is the time extracted from the dumpstate line in a bugreport.
+	referenceTime string
+
+	// earliestTimeSeen is the timestamp corresponding to the last event
+	// recorded in the Previous Registration section. If there is no previous
+	// registration section, ealiestTimeSeen is set to be the timestamp for
+	// referenceTime.
+	earliestTimeSeen int64
 
 	// loc is the location parsed from timezone information in the bugreport.
 	// The previous registration is in the user's local timezone
@@ -145,6 +183,10 @@ type parser struct {
 
 	// sensors is a map from sensor number to the relevant sensor's information.
 	sensors map[int32]bugreportutils.SensorInfo
+
+	// activeSensors is a map from sensor number to the relevant sensor's
+	// information. This map only contains information for running sensors.
+	activeSensors map[int32]activeSensor
 
 	// activeConns is a map from an identifier to the relevant connection information.
 	// If a sensor is actively subscribed by a package when the bugreport is
@@ -194,6 +236,24 @@ func (p *parser) valid() bool {
 	return (p.idx < len(p.lines)) && (p.idx >= 0)
 }
 
+// getCurrentTime returns a string for the input time in the form of "HH:MM:SS"
+// e.g. "18:06:31" is returned instead of "18:6:31"
+func getCurrentTime(d time.Time) string {
+	hour := strconv.Itoa(d.Hour())
+	min := strconv.Itoa(d.Minute())
+	sec := strconv.Itoa(d.Second())
+	if len(hour) < 2 {
+		hour = fmt.Sprintf("0%s", hour)
+	}
+	if len(min) < 2 {
+		min = fmt.Sprintf("0%s", min)
+	}
+	if len(sec) < 2 {
+		sec = fmt.Sprintf("0%s", sec)
+	}
+	return fmt.Sprintf("%s:%s:%s", hour, min, sec)
+}
+
 // Parse function collects information regarding active connections and
 // records availalbe sensor subscription events in the sensorservice section
 // as CSV entry.
@@ -203,46 +263,107 @@ func (p *parser) valid() bool {
 func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
-		return OutputData{"", nil, nil,
-			[]error{fmt.Errorf("missing time zone line in bug report: %v", err)}}
+		parseErr := []error{fmt.Errorf(
+			"Parse Time Zone: missing time zone line in bug report : %s", err)}
+		return OutputData{"", nil, parseErr, nil}
 	}
-	// Extract the year and month from the bugreport dumpstate line.
+
+	// Extract the date and time from the bugreport dumpstate line.
 	d, err := bugreportutils.DumpState(f)
 	if err != nil {
-		return OutputData{"", nil, nil, []error{
-			fmt.Errorf("could not find dumpstate information in the bugreport: %v",
-				err)}}
+		parseErr := []error{
+			fmt.Errorf("Parse Dumpstate: could not find dumpstate information in the bugreport")}
+		return OutputData{"", nil, parseErr, nil}
 	}
+
 	buf := new(bytes.Buffer)
 	p := &parser{
 		referenceYear:  d.Year(),
-		referenceMonth: d.Month(),
+		referenceMonth: int(d.Month()),
 		referenceDay:   d.Day(),
+		referenceTime:  getCurrentTime(d),
 		loc:            loc,
 		buf:            buf,
 		csvState:       csv.NewState(buf, true),
 		lines:          strings.Split(f, "\n"),
+		activeSensors:  make(map[int32]activeSensor),
 		activeConns:    make(map[string]*acpb.ActiveConn),
 		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
+	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+	p.earliestTimeSeen = referenceTimestamp
 
 	for p.valid() {
 		l := p.line() // Read the current line and advance the line position.
+		// Parse active sensor information.
+		if m, _ := historianutils.SubexpNames(sensorRunningLineRE, l); m {
+			p.parsingErrs, p.sensorErrs = p.extractActiveSensorInfo()
+			continue
+		}
 		// Parse active connection information.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
-			if err := p.extractActiveConnInfo(); err != nil {
-				p.parsingErrs = append(p.parsingErrs, err)
-			}
+			p.parsingErrs, p.sensorErrs = p.extractActiveConnInfo()
+			continue
+		}
+		// Parse registration history information
+		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
+			p.parsingErrs, p.sensorErrs = p.extractRegistrationHistory()
 			continue
 		}
 	}
-	return OutputData{"", p.createActiveConnPBList(), p.sensorErrs, p.parsingErrs}
+	p.creatUnseenActiveConnectionHistory()
+
+	return OutputData{p.buf.String(), p.createActiveConnPBList(),
+		p.parsingErrs, p.sensorErrs}
+}
+
+// extractActiveConnInfo extracts information for active sensors found in
+// the sensorservice dump of a bugreport.
+func (p parser) extractActiveSensorInfo() ([]error, []error) {
+	for p.valid() {
+		line := p.line()
+		// Stop when reaching the Sensor List sections.
+		if inSensorList, _ := historianutils.SubexpNames(sensorListRE, line); inSensorList {
+			break
+		}
+		if m, result := historianutils.SubexpNames(activeSensorRE, line); m {
+			n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("[Active Sensor]: error parsing sensor number %v for line %v:%v",
+						result["sensorNumber"], line, err))
+				continue
+			}
+			sensorNumber := int32(n)
+			samplingPeriod, err := strconv.ParseFloat(result["samplingPeriod"], 64)
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("[Active Sensor] sensor(%v): error parsing sampling period %v for line %v:%v",
+						sensorNumber, result["samplingPeriod"], line, err))
+				continue
+			}
+			batchingPeriod, err := strconv.ParseFloat(result["batchingPeriod"], 64)
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("[Active Sensor] sensor(%v): error parsing batching period %v for line %v:%v",
+						sensorNumber, result["batchingPeriod"], line, err))
+				continue
+			}
+			p.activeSensors[sensorNumber] = activeSensor{
+				sensorNumber:   sensorNumber,
+				samplingPeriod: int32(samplingPeriod * 1000),
+				batchingPeriod: int32(batchingPeriod * 1000),
+			}
+		}
+	}
+	return p.parsingErrs, p.sensorErrs
 }
 
 // extractActiveConnInfo extracts active connections information found in
 // the sensorservice dump of a bugreport.
-func (p parser) extractActiveConnInfo() error {
+func (p parser) extractActiveConnInfo() ([]error, []error) {
 	curConnNum := int32(-1)
 	// connections is a map from active connection number to
 	// information for the relevant connection.
@@ -268,8 +389,8 @@ func (p parser) extractActiveConnInfo() error {
 			connNum, err := strconv.Atoi(result["connNum"])
 			if err != nil {
 				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("could not parse connection number %v:%v",
-						result["connNum"], err))
+					fmt.Errorf("%s: error parsing connection number %v:%v",
+						parseConnErrStr, result["connNum"], err))
 				continue
 			}
 			// Since proto buff restricts that field numbers must be positive
@@ -278,19 +399,23 @@ func (p parser) extractActiveConnInfo() error {
 			curConnNum = int32(connNum) + 1
 			if _, ok := connections[curConnNum]; !ok {
 				connections[curConnNum] = &acpb.ActiveConn{
-					Number:        curConnNum,
-					UID:           -1,
-					PendingFlush:  -1,
-					SensorNumber:  -1,
-					OperatingMode: ``,
-					PackageName:   ``,
+					Number:         curConnNum,
+					OperatingMode:  ``,
+					PackageName:    ``,
+					UID:            -1,
+					SensorNumber:   -1,
+					PendingFlush:   -1,
+					SamplingPeriod: -1,
+					BatchingPeriod: -1,
+					HasRecord:      false,
 				}
 			}
 		} else {
 			_, ok := connections[curConnNum]
 			if !ok {
-				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("no information regarding connection %v", curConnNum))
+				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+					"%s: connection(%d): no information for this connection",
+					parseConnErrStr, curConnNum))
 				continue
 			}
 			if lineTwo, result := historianutils.SubexpNames(connLineTwoRE, line); lineTwo {
@@ -298,31 +423,40 @@ func (p parser) extractActiveConnInfo() error {
 			} else if lineThree, result := historianutils.SubexpNames(connLineThreeRE, line); lineThree {
 				uid, err := strconv.Atoi(result["uid"])
 				if err != nil {
-					p.parsingErrs = append(p.parsingErrs,
-						fmt.Errorf("active connection %d: cannot parse uid %v:%v",
-							curConnNum, result["uid"], err))
+					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+						"%s: connection(%d): error parsing uid %v:%v",
+						parseConnErrStr, curConnNum, result["uid"], err))
 					continue
 				}
 				connections[curConnNum].UID = int32(uid)
 				connections[curConnNum].PackageName = result["packageName"]
 			} else if lineFour, result := historianutils.SubexpNames(connLineFourRE, line); lineFour {
-				sensorNumber, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+				n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
 				if err != nil {
-					p.parsingErrs = append(p.parsingErrs,
-						fmt.Errorf("active connection %d: cannot parse sensor handle %v:%v",
-							curConnNum, result["sensorNumber"], err))
+					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+						"%s: connection(%d): error parsing sensorNumber %v:%v",
+						parseConnErrStr, curConnNum, result["sensorNumber"], err))
 					continue
 				}
-				sensor := int32(sensorNumber)
-				connections[curConnNum].SensorNumber = sensor
+				sensorNumber := int32(n)
+				connections[curConnNum].SensorNumber = sensorNumber
 				pendingFlush, err := strconv.Atoi(result["pendingFlush"])
 				if err != nil {
-					p.parsingErrs = append(p.parsingErrs,
-						fmt.Errorf("active connection %d: cannot parse pendingFlush %v:%v",
-							curConnNum, result["uid"], err))
+					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+						"%s: connection(%d): error parsing pendingFlush %v:%v",
+						parseConnErrStr, curConnNum, result["pendingFlush"], err))
 					continue
 				}
 				connections[curConnNum].PendingFlush = int32(pendingFlush)
+				if activeSensor, exist := p.activeSensors[sensorNumber]; exist {
+					connections[curConnNum].SamplingPeriod = activeSensor.samplingPeriod
+					connections[curConnNum].BatchingPeriod = activeSensor.batchingPeriod
+				} else {
+					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+						"[Active Connection]: connection(%d): the sensor(%d) is not active according to the sensor device section",
+						curConnNum, sensorNumber))
+					continue
+				}
 			}
 		}
 	}
@@ -333,18 +467,226 @@ func (p parser) extractActiveConnInfo() error {
 		identifier := fmt.Sprintf("%d,%s", conn.SensorNumber, conn.PackageName)
 		p.activeConns[identifier] = conn
 	}
-
-	return nil
+	return p.parsingErrs, p.sensorErrs
 }
 
 // createActiveConnPBList creates a list of active connection information
 // based on the map built while parsing sensorservice dump.
-func (p *parser) createActiveConnPBList() []*acpb.ActiveConn {
-	var activeConnections []*acpb.ActiveConn
+func (p *parser) createActiveConnPBList() map[int32]*acpb.ActiveConn {
+	activeConnections := make(map[int32]*acpb.ActiveConn)
 	for _, conn := range p.activeConns {
-		activeConnections = append(activeConnections, conn)
+		activeConnections[conn.Number] = conn
 	}
 	return activeConnections
+}
+
+// extractRegistrationHistory extracts all previous registration information
+// found in the sensorservice dump of a bug report.
+func (p *parser) extractRegistrationHistory() ([]error, []error) {
+	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+	for p.valid() {
+		l := p.line()
+		var result map[string]string
+		isAdd := false
+		if add, match := historianutils.SubexpNames(addRegistrationRE, l); add {
+			result = match
+			isAdd = true
+		} else if remove, match := historianutils.SubexpNames(removeRegistrationRE, l); remove {
+			result = match
+		} else {
+			// Reach the end of the registration section.
+			break
+		}
+
+		// Get the timestamp of the record.
+		// Accomodate the case where the timestamp includes date.
+		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
+		var timestamp int64
+		var timestampErr error
+		if hasDate {
+			month, err := strconv.Atoi(date["month"])
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("%s: error parsing timestamp for line %v: %v",
+						parseRegErrStr, l, timestampErr))
+				continue
+			}
+			day, err := strconv.Atoi(date["day"])
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs,
+					fmt.Errorf("%s: error parsing timestamp for line %v: %v",
+						parseRegErrStr, l, timestampErr))
+				continue
+			}
+			timestamp, timestampErr = p.fullTimestamp(month, day,
+				result["timeStamp"])
+		} else {
+			timestamp, timestampErr = p.fullTimestamp(p.referenceMonth,
+				p.referenceDay, result["timeStamp"])
+		}
+		if timestampErr != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("%s: error parsing timestamp for line %v: %v",
+					parseRegErrStr, l, timestampErr))
+			continue
+		}
+		if p.earliestTimeSeen > timestamp {
+			p.earliestTimeSeen = timestamp
+		}
+
+		// All registration history records information for
+		// sensorNumber, uid, and packageName.
+		handle, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+				"%s: error parsing sensorNumber %v for line %v: %v",
+				parseRegErrStr, result["sensorNumber"], l, err))
+			continue
+		}
+		sensorNumber := int32(handle)
+		_, exist := p.sensors[sensorNumber]
+		if !exist {
+			p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+				"%s: sensor %d: invalid subscription for an non-existing sensor",
+				sensorErrStr, sensorNumber))
+			continue
+		}
+		packageName := result["packageName"]
+		uid, err := strconv.Atoi(result["uid"])
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("%s: error parsing uid %v for line %v: %v",
+					parseRegErrStr, result["uid"], l, err))
+			continue
+		}
+		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+
+		var value string
+		if isAdd {
+			// Currently processing an activated statement.
+			samplingPeriod, err := strconv.Atoi(result["samplingPeriod"])
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+					"%s: error parsing samplingPeriod %v for line %v: %v",
+					parseRegErrStr, result["samplingPeriod"], l, err))
+				continue
+			}
+			batchingPeriod, err := strconv.Atoi(result["batchingPeriod"])
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+					"%s: error parsing batchingPeriod %v for line %v: %v",
+					parseRegErrStr, result["batchingPeriod"], l, err))
+				continue
+			}
+			value = fmt.Sprintf("%d,%d,%s,%d,%d", sensorNumber,
+				uid, packageName, samplingPeriod, batchingPeriod)
+
+			_, exist := p.history[identifier]
+			if !exist {
+				// If there is no history of de-activating a subscription,
+				// the subscription has to be active.
+				if conn, isActiveConn := p.activeConns[identifier]; isActiveConn {
+					// For active connection, set current time as the end time
+					// for the ongoing subscription event.
+					p.csvState.Print(sensorRegisDesc, "string", timestamp,
+						referenceTimestamp, value, "")
+					conn.HasRecord = true
+					p.activeConns[identifier] = conn
+				} else {
+					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+						"[Invalid Activation]: connection between pkg(%s) and sensor(%d) should be active",
+						packageName, sensorNumber))
+				}
+			} else {
+				// A de-activation statement for the subscription event is seen.
+				eventInfo := p.history[identifier]
+				if eventInfo.StartMs != -1 {
+					// A previous de-activation statement for this connection
+					// has paired up with an activation statement. The current
+					// activation statement is an extra one.
+					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+						"[Multiple Activation]: for pkg(%s) and sensor(%d)",
+						packageName, sensorNumber))
+				} else {
+					// The current activation statement can pair up with a
+					// previous de-activation statement to complete a
+					// subscription event.
+					eventInfo.StartMs = timestamp
+					eventInfo.SamplingPeriod = int32(samplingPeriod)
+					eventInfo.BatchingPeriod = int32(batchingPeriod)
+					p.csvState.Print(sensorRegisDesc, "string",
+						timestamp, eventInfo.EndMs, value, "")
+				}
+			}
+		} else {
+			// Currently processing an de-activation statement.
+			if event, exist := p.history[identifier]; exist {
+				if event.StartMs == -1 {
+					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+						"[Multiple De-Activation]: for pkg(%s) and sensor(%d)",
+						packageName, sensorNumber))
+				} else {
+					// Current de-activation statement will be counted as
+					// a new subscription event.
+					eventInfo := &SubscriptionInfo{
+						StartMs:      -1,
+						EndMs:        timestamp,
+						SensorNumber: sensorNumber,
+						PackageName:  packageName,
+					}
+					p.history[identifier] = eventInfo
+				}
+			} else {
+				eventInfo := &SubscriptionInfo{
+					StartMs:      -1,
+					EndMs:        timestamp,
+					SensorNumber: sensorNumber,
+					PackageName:  packageName,
+				}
+				p.history[identifier] = eventInfo
+			}
+		}
+	}
+
+	return p.parsingErrs, p.sensorErrs
+}
+
+// To sort the active connection information, the following interface is used.s
+type activeConns []*acpb.ActiveConn
+
+func (slice activeConns) Len() int {
+	return len(slice)
+}
+
+func (slice activeConns) Less(i, j int) bool {
+	return slice[i].Number < slice[j].Number
+}
+
+func (slice activeConns) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func (p parser) creatUnseenActiveConnectionHistory() {
+	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+
+	// Store all the active connections without history in a list and order
+	// the list by the connection number.
+	connNoHistory := make(activeConns, 0, len(p.activeConns))
+	for _, conn := range p.activeConns {
+		if !conn.HasRecord {
+			connNoHistory = append(connNoHistory, conn)
+		}
+	}
+	sort.Sort(connNoHistory)
+
+	for _, conn := range connNoHistory {
+		value := fmt.Sprintf("%d,%d,%s,%d,%d", conn.SensorNumber, conn.UID,
+			conn.PackageName, conn.SamplingPeriod, conn.BatchingPeriod)
+		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimeSeen,
+			referenceTimestamp, value, "")
+	}
 }
 
 // This function is directly copied from the activity.go file.
@@ -358,14 +700,10 @@ func validMonth(m int) bool {
 // Since previous registration events have no corresponding year,
 // we reconstruct the full timestamp using the stored reference year and
 // month extracted from the dumpstate line of the bug report.
-func (p *parser) fullTimestamp(month, day, partialTimestamp string) (int64, error) {
+func (p *parser) fullTimestamp(month, day int, partialTimestamp string) (int64, error) {
 	remainder := "000"
-	parsedMonth, err := strconv.Atoi(month)
-	if err != nil {
-		return 0, err
-	}
-	if !validMonth(parsedMonth) {
-		return 0, fmt.Errorf("invalid month: %d", parsedMonth)
+	if !validMonth(month) {
+		return 0, fmt.Errorf("invalid month: %d", month)
 	}
 	year := p.referenceYear
 	// The reference month and year represents the time the bugreport was taken.
@@ -383,16 +721,25 @@ func (p *parser) fullTimestamp(month, day, partialTimestamp string) (int64, erro
 	// If the bug report event log begins near the end of a year, and rolls over
 	// to the next year, the event would have taken place in the year preceding
 	// the reference year.
-	if int(p.referenceMonth)-parsedMonth < -1 {
+	if p.referenceMonth-month < -1 {
 		year--
 		// Some events may still occur after the given reference date,
 		// so we check for a year rollover in the other direction.
-	} else if p.referenceMonth == time.December &&
-		time.Month(parsedMonth) == time.January {
+	} else if p.referenceMonth == 12 && month == 1 {
 		year++
 	}
+
+	monStr := strconv.Itoa(month)
+	dayStr := strconv.Itoa(day)
+	if month < 10 {
+		monStr = fmt.Sprintf("0%d", month)
+	}
+	if day < 10 {
+		dayStr = fmt.Sprintf("0%d", day)
+	}
+
 	return bugreportutils.TimeStampToMs(
-		fmt.Sprintf("%d-%s-%s %s", year, month, day, partialTimestamp),
+		fmt.Sprintf("%d-%s-%s %s", year, monStr, dayStr, partialTimestamp),
 		remainder, p.loc)
 }
 

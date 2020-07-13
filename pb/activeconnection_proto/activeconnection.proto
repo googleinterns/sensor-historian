@@ -26,4 +26,7 @@ message ActiveConn{
     int32 UID = 4;
     int32 SensorNumber = 5;
     int32 PendingFlush = 6;
+    int32 SamplingPeriod = 7;
+    int32 BatchingPeriod = 8;
+    bool HasRecord = 9;
 }
