@@ -1159,7 +1159,6 @@ historian.Bars.prototype.tooltipText_ = function(
     // output for copying the tooltip.
     formattedLines.push('<div id="values-container"></div>');
   }
-
   if (series.name == historian.metrics.Csv.WAKE_LOCK_HELD) {
     // WAKE_LOCK_HELD only shows the first wakelock, so show a warning.
     // Clone the array so we don't push a span to the original array each time.
@@ -1621,7 +1620,8 @@ historian.Bars.prototype.createSortedTable_ = function(series, cluster) {
 /**
  * Creates a table to display the sensor entries in the given cluster.
  *
- * @param {!historian.data.ClusterEntry} cluster The cluster to display.
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
  * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
  *     The table header and body.
  * @private

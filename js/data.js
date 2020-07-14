@@ -311,7 +311,6 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
       var seriesName = d['type'] == historian.metrics.ERROR_TYPE ?
           historian.metrics.typedMetricName(d['type'], d['metric']) :
           d['metric'];
-          
       var v = d['value'];
       switch (d['type']) {
         case 'bool':
