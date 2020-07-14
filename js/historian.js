@@ -370,7 +370,7 @@ historian.singleView_ = [
     ],
     barHidden: [],
     logSources: [
-      historian.historianV2Logs.Sources.SENSORSERVICE
+      historian.historianV2Logs.Sources.SENSORSERVICE_DUMP
     ],
     logSourcesHidden: [],
     defaultLevelMetricOverride: '',  // Disable default level metric.
