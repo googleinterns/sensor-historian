@@ -346,10 +346,10 @@ historian.singleView_ = [
     showReportTaken: true
   },
   {
-    // New tab for sensorservice.
+    // New tab for sensor historian.
     panel: historian.panels_.historian.selector,
-    tabSelector: '#tab-historian-sensorservice',
-    container: '#historian-sensorservice',
+    tabSelector: '#tab-historian-sensor',
+    container: '#historian-sensor',
     barOrder: [
       {
         source: historian.historianV2Logs.Sources.HEADING,

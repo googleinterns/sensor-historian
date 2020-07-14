@@ -583,7 +583,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 				if conn, isActive := p.activeConns[identifier]; isActive {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
-					p.csvState.Print(sensorRegisDesc, "string", timestamp,
+					sensorName := p.sensors[sensorNumber].Name
+					p.csvState.Print(sensorName, "string", timestamp,
 						referenceTimestamp, value, "")
 					conn.HasSensorserviceRecord = true
 					p.activeConns[identifier] = conn
@@ -610,7 +611,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					eventInfo.StartMs = timestamp
 					eventInfo.SamplingPeriodUs = int32(samplingPeriodUs)
 					eventInfo.BatchingPeriodUs = int32(batchingPeriodUs)
-					p.csvState.Print(sensorRegisDesc, "string",
+					sensorName := p.sensors[sensorNumber].Name
+					p.csvState.Print(sensorName, "string",
 						timestamp, eventInfo.EndMs, value, "")
 				}
 			}
@@ -682,7 +684,8 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 		value := fmt.Sprintf("%d,%d,%s,%d,%d,%s", conn.SensorNumber, conn.UID,
 			conn.PackageName, conn.SamplingPeriodUs, conn.BatchingPeriodUs,
 			conn.Source)
-		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimeSeen,
+		sensorName := p.sensors[conn.SensorNumber].Name
+		p.csvState.Print(sensorName, "string", p.earliestTimeSeen,
 			referenceTimestamp, value, "")
 	}
 }

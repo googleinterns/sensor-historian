@@ -73,7 +73,7 @@ const (
 	powerMonitorLog = "Power Monitor"
 	systemLog       = "System"
 	wearableLog     = "Wearable"
-	sensorService   = "Sensorservice"
+	sensorService   = "Sensorservice Dump"
 
 	// Analyzable file types.
 	bugreportFT    = "bugreport"
