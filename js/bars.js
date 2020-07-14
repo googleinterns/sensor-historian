@@ -1159,6 +1159,7 @@ historian.Bars.prototype.tooltipText_ = function(
     // output for copying the tooltip.
     formattedLines.push('<div id="values-container"></div>');
   }
+
   if (series.name == historian.metrics.Csv.WAKE_LOCK_HELD) {
     // WAKE_LOCK_HELD only shows the first wakelock, so show a warning.
     // Clone the array so we don't push a span to the original array each time.
@@ -1257,6 +1258,9 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     case historian.metrics.Csv.STRICT_MODE_VIOLATION:
       return this.createSortedTable_(series.name, cluster);
     default:
+      if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+        return this.createSensorTable_(series, cluster);
+      };
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1614,6 +1618,39 @@ historian.Bars.prototype.createSortedTable_ = function(series, cluster) {
   return {header: headRow, body: bodyRows};
 };
 
+/**
+ * Creates a table to display the sensor entries in the given cluster.
+ *
+ * @param {!historian.ClusteredSeriesData} series The series the cluster
+ *     belongs to.
+ * @param {!historian.data.ClusterEntry} cluster The cluster to display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorTable_ = function(series, cluster){
+  var headRow = [
+    'UID',
+    'Package Name',
+    'Source',
+    'Total Duration'
+  ];
+  var bodyRows = values.map(function(clusterValue) {
+    var value = clusterValue.value;
+    var formattedValue = typeof value == 'string' || typeof value == 'number' ?
+        historian.color.valueFormatter(series.name, value) : value;
+    var tblRow = [
+      formattedValue,
+      clusterValue.count
+    ];
+
+    tblRow.push(historian.time.formatDuration(clusterValue.duration));
+
+    return tblRow;
+  }, this);
+  
+  return {header: headRow, body: bodyRows};
+};
 
 /**
  * Creates a table to display the broadcast entries in the given cluster.
