@@ -375,7 +375,7 @@ historian.singleView_ = [
     logSourcesHidden: [],
     defaultLevelMetricOverride: '',  // Disable default level metric.
     defaultXExtentLogs: [], // Fit any shown data.
-    showReportTaken: true
+    showReportTaken: false
   }
 ];
 
@@ -892,6 +892,11 @@ historian.initialize = function(json) {
   if (historian.sdkVersion < 21) {
     historian.showOnlyHistorianV1();
   } else {
+    // Sensor historian only supports andriod sdk version 26 and onwards.
+    if (historian.sdkVersion < 26){
+      $('sensor-historian').remove();
+    }
+
     if (historian.criticalError) {
       historian.note.show(historian.criticalError);
     }
