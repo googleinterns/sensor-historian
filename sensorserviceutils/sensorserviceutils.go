@@ -114,6 +114,7 @@ const (
 type OutputData struct {
 	CSV         string
 	ActiveConns map[int32]*acpb.ActiveConn
+	SensorsInfo map[int32]string
 	ParsingErrs []error
 	SensorErrs  []error
 }
@@ -246,7 +247,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	if err != nil {
 		parseErr := []error{fmt.Errorf(
 			"Parse Time Zone: missing time zone line in bug report : %s", err)}
-		return OutputData{"", nil, parseErr, nil}
+		return OutputData{"", nil, nil, parseErr, nil}
 	}
 
 	// Extract the date and time from the bugreport dumpstate line.
@@ -255,7 +256,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		parseErr := []error{
 			fmt.Errorf("Parse Dumpstate: could not find dumpstate " +
 				"information in the bugreport")}
-		return OutputData{"", nil, parseErr, nil}
+		return OutputData{"", nil, nil, parseErr, nil}
 	}
 
 	buf := new(bytes.Buffer)
@@ -298,7 +299,14 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	p.creatUnseenActiveConnectionHistory()
 
 	return OutputData{p.buf.String(), p.createActiveConnPBList(),
-		p.parsingErrs, p.sensorErrs}
+		p.createSensorsInfo(), p.parsingErrs, p.sensorErrs}
+}
+
+func (p parser) createSensorsInfo() {
+	sensorsInfoMap := make([int32]string)
+	for sensorNum, sensor := range p.sensors {
+
+	}
 }
 
 // extractActiveConnInfo extracts information for active sensors found in

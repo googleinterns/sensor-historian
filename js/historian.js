@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -853,6 +853,8 @@ historian.initialize = function(json) {
   historian.usingComparison = json.usingComparison;
   historian.criticalError = data[0].criticalError;
   historian.reportVersion = data[0].reportVersion;
+  historian.sensorsInfo = data[0].sensorsInfo;
+  console.log(sensorsInfo)
   if (data[0].note) {
     historian.note.show(data[0].note);
   }

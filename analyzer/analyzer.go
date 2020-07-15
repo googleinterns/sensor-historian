@@ -130,12 +130,16 @@ type uploadResponse struct {
 	DeviceCapacity      float32                  `json:"deviceCapacity"`
 	HistogramStats      presenter.HistogramStats `json:"histogramStats"`
 	TimeToDelta         map[string]string        `json:"timeToDelta"`
-	CriticalError       string                   `json:"criticalError"` // Critical errors are ones that cause parsing of important data to abort early and should be shown prominently to the user.
-	Note                string                   `json:"note"`          // A message to show to the user that they should be aware of.
-	FileName            string                   `json:"fileName"`
-	Location            string                   `json:"location"`
-	OverflowMs          int64                    `json:"overflowMs"`
-	IsDiff              bool                     `json:"isDiff"`
+	// Critical errors are ones that cause parsing of important data to abort
+	// early and should be shown prominently to the user.
+	CriticalError string `json:"criticalError"`
+	// A message to show to the user that they should be aware of.
+	Note        string           `json:"note"`
+	FileName    string           `json:"fileName"`
+	Location    string           `json:"location"`
+	OverflowMs  int64            `json:"overflowMs"`
+	IsDiff      bool             `json:"isDiff"`
+	SensorsInfo map[int32]string `json:"sensorsInfo"`
 }
 
 type uploadResponseCompare struct {
@@ -968,6 +972,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			Location:        late.dt.Location().String(),
 			OverflowMs:      summariesOutput.overflowMs,
 			IsDiff:          diff,
+			SensorsInfo:     ,
 		})
 		pd.data = append(pd.data, data)
 

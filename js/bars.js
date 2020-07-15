@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-202 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1259,7 +1259,7 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     default:
       if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
         return this.createSensorTable_(cluster.getSortedValues(false));
-      };
+      }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1638,7 +1638,7 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   var bodyRows = values.map(function(entry) {
     var parts = entry.value.split(',');
     var duration = historian.time.formatDuration(entry.duration);
-    return [parts[1], parts[2], parts[3], parts[4], parts[5], duration]
+    return [parts[1], parts[2], parts[3], parts[4], parts[5], duration];
   });
   return {header: headRow, body: bodyRows};
 };
