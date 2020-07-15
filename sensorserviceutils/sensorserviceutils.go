@@ -114,6 +114,7 @@ const (
 type OutputData struct {
 	CSV         string
 	ActiveConns map[int32]*acpb.ActiveConn
+	SensorsInfo map[int32]string
 	ParsingErrs []error
 	SensorErrs  []error
 }
@@ -246,7 +247,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	if err != nil {
 		parseErr := []error{fmt.Errorf(
 			"Parse Time Zone: missing time zone line in bug report : %s", err)}
-		return OutputData{"", nil, parseErr, nil}
+		return OutputData{"", nil, nil, parseErr, nil}
 	}
 
 	// Extract the date and time from the bugreport dumpstate line.
@@ -255,7 +256,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		parseErr := []error{
 			fmt.Errorf("Parse Dumpstate: could not find dumpstate " +
 				"information in the bugreport")}
-		return OutputData{"", nil, parseErr, nil}
+		return OutputData{"", nil, nil, parseErr, nil}
 	}
 
 	buf := new(bytes.Buffer)
@@ -298,7 +299,20 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	p.creatUnseenActiveConnectionHistory()
 
 	return OutputData{p.buf.String(), p.createActiveConnPBList(),
-		p.parsingErrs, p.sensorErrs}
+		p.createSensorsInfo(), p.parsingErrs, p.sensorErrs}
+}
+
+func (p parser) createSensorsInfo() map[int32]string {
+	sensorsInfoMap := make(map[int32]string)
+	for sensorNum, sensor := range p.sensors {
+		value := fmt.Sprintf("%s,%s,%d,%s,%d,%d,%t,%d,%d,%t",
+			sensor.Name, sensor.Type, sensor.Number, sensor.RequestMode,
+			sensor.MaxDelayInUs, sensor.MinDelayInUs, sensor.Batch,
+			sensor.Max, sensor.Reserved, sensor.WakeUp)
+		sensorsInfoMap[sensorNum] = value
+	}
+	fmt.Println(sensorsInfoMap)
+	return sensorsInfoMap
 }
 
 // extractActiveConnInfo extracts information for active sensors found in
@@ -581,7 +595,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 				if conn, isActive := p.activeConns[identifier]; isActive {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
-					p.csvState.Print(sensorRegisDesc, "string", timestampInMs,
+					sensorName := p.sensors[sensorNumber].Name
+					p.csvState.Print(sensorName, "string", timestampInMs,
 						referenceTimestampInMs, value, "")
 					conn.HasSensorserviceRecord = true
 					p.activeConns[identifier] = conn
@@ -608,7 +623,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					eventInfo.StartMs = timestampInMs
 					eventInfo.SamplingPeriodUs = int32(samplingPeriodUs)
 					eventInfo.BatchingPeriodUs = int32(batchingPeriodUs)
-					p.csvState.Print(sensorRegisDesc, "string",
+					sensorName := p.sensors[sensorNumber].Name
+					p.csvState.Print(sensorName, "string",
 						timestampInMs, eventInfo.EndMs, value, "")
 				}
 			}
@@ -680,7 +696,8 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 		value := fmt.Sprintf("%d,%d,%s,%d,%d,%s", conn.SensorNumber, conn.UID,
 			conn.PackageName, conn.SamplingPeriodUs, conn.BatchingPeriodUs,
 			conn.Source)
-		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimestampInMs,
+		sensorName := p.sensors[conn.SensorNumber].Name
+		p.csvState.Print(sensorName, "string", p.earliestTimestampInMs,
 			referenceTimestampInMs, value, "")
 	}
 }
