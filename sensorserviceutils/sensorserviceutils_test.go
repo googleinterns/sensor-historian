@@ -96,7 +96,9 @@ func TestParse(t *testing.T) {
 		wantSensorErrors []error
 	}{
 		{
-			name: "[Active Sensor and Connections] Test 1",
+			name: "[Active Sensor and Connections] Test 1: " +
+				"All entries entered for active sensors and connections. " +
+				"No sensor errors.",
 			// All active sensors's information is available.
 			// Previous registration section but no history in it,
 			// so all active connections have its relevant subscription history.
@@ -212,12 +214,14 @@ func TestParse(t *testing.T) {
 			}, "\n"),
 		},
 		{
-			name: "[Active Sensor and Connections] Test 2",
+			name: "[Active Sensor and Connections] Test 2: " +
+				"Active connection 2 misses information. " +
+				"No sensor errors.",
 			// Missing information for active connection 2.
 			// All active sensor's information is available.
 			// Previous registration section but no history in it,
 			// so all active connections have its relevant subscription history.
-			// No Sensor Errors.s
+			// No Sensor Errors.
 			finput: strings.Join([]string{
 				`========================================================`,
 				`== dumpstate: 2015-07-07 18:07:00`,
@@ -273,7 +277,9 @@ func TestParse(t *testing.T) {
 			}, "\n"),
 		},
 		{
-			name: "[Active Sensor and Connections] Test 3",
+			name: "[Active Sensor and Connections] Test 3: " +
+				"Active connection 2 has repeated information. " +
+				"No sensor errors.",
 			// Active connection 2 has repeated information.
 			// All active sensor's information is available.
 			// No previous registration section so all of the active connections
@@ -339,7 +345,9 @@ func TestParse(t *testing.T) {
 			}, "\n"),
 		},
 		{
-			name: "[Active Sensor and Connections] Test 4",
+			name: "[Active Sensor and Connections] Test 4: " +
+				"Missing information for active sensor 4. " +
+				"1 Sensor error of [Active Connection] exists.",
 			// Information for all active connections is availalbe.
 			// Missing active sensor information for sensor 4, one sensor error.
 			// No previous registration section so all of the active connections
@@ -404,11 +412,13 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "[History] Test 1",
+			name: "[History] Test 1: " +
+				"All entries entered. " +
+				"No sensor errors.",
 			// History only has activation statements for 4/5 active connections.
 			// Information for all active sensors are availalbe.
 			// All active connections have subscription events.
-			// No errors.
+			// No Sensor Errors.
 			finput: strings.Join([]string{
 				`========================================================`,
 				`== dumpstate: 2015-07-07 18:07:00`,
@@ -523,11 +533,14 @@ func TestParse(t *testing.T) {
 			}, "\n"),
 		},
 		{
-			name: "[History] Test 2",
+			name: "[History] Test 2: " +
+				"Missing information for sensor 1. " +
+				"1 Sensor error of [Active Connection] exists.",
 			// History only has activation statements for 4/5 active connections.
 			// Information for sensor 1 is not available, but an activation
 			// statement for Connection No.5 exists.
 			// All active connections have subscription events.
+			// One sensor error for active connection No.5.
 			finput: strings.Join([]string{
 				`========================================================`,
 				`== dumpstate: 2015-07-07 18:07:00`,
@@ -644,7 +657,9 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			name: "[History] Test 3",
+			name: "[History] Test 3: " +
+				"All entries entered. Subscription history all match up." +
+				"No sensor error.",
 			// History only has activation statements for all active connections.
 			// Information for all active sensors are available.
 			// All active connections have subscription events.
@@ -777,7 +792,9 @@ func TestParse(t *testing.T) {
 			}, "\n"),
 		},
 		{
-			name: "[History] Test 4",
+			name: "[History] Test 4: " +
+				"All entries entered. s" +
+				"3 Sensor errors exist: [Invalid Activation], [Multiple Activation], [Multiple De-activation].",
 			// History only has activation statements for all active connections.
 			// Information for all active sensors are available.
 			// All active connections have subscription events.
