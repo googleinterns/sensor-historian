@@ -972,7 +972,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			Location:        late.dt.Location().String(),
 			OverflowMs:      summariesOutput.overflowMs,
 			IsDiff:          diff,
-			SensorsInfo:     ,
+			SensorsInfo:     sensorserviceOutput.SensorsInfo,
 		})
 		pd.data = append(pd.data, data)
 

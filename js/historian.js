@@ -854,7 +854,7 @@ historian.initialize = function(json) {
   historian.criticalError = data[0].criticalError;
   historian.reportVersion = data[0].reportVersion;
   historian.sensorsInfo = data[0].sensorsInfo;
-  console.log(sensorsInfo)
+  
   if (data[0].note) {
     historian.note.show(data[0].note);
   }

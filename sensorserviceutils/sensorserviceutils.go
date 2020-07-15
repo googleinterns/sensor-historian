@@ -311,7 +311,6 @@ func (p parser) createSensorsInfo() map[int32]string {
 			sensor.Max, sensor.Reserved, sensor.WakeUp)
 		sensorsInfoMap[sensorNum] = value
 	}
-	fmt.Println(sensorsInfoMap)
 	return sensorsInfoMap
 }
 
