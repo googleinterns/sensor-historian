@@ -302,11 +302,17 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		p.createSensorsInfo(), p.parsingErrs, p.sensorErrs}
 }
 
-func (p parser) createSensorsInfo() {
-	sensorsInfoMap := make([int32]string)
+func (p parser) createSensorsInfo() map[int32]string {
+	sensorsInfoMap := make(map[int32]string)
 	for sensorNum, sensor := range p.sensors {
-
+		value := fmt.Sprintf("%s,%s,%d,%s,%d,%d,%t,%d,%d,%t",
+			sensor.Name, sensor.Type, sensor.Number, sensor.RequestMode,
+			sensor.MaxDelayInUs, sensor.MinDelayInUs, sensor.Batch,
+			sensor.Max, sensor.Reserved, sensor.WakeUp)
+		sensorsInfoMap[sensorNum] = value
 	}
+	fmt.Println(sensorsInfoMap)
+	return sensorsInfoMap
 }
 
 // extractActiveConnInfo extracts information for active sensors found in
