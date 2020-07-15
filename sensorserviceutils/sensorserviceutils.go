@@ -81,7 +81,7 @@ var (
 	// addRegistrationRE is a regular expression to match the log that adds
 	// subscription in the sensorservice dump in the bugreport
 	// for Android starting from NRD42 and onwards.
-	addRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)\s*` +
+	addRegistrationRE = regexp.MustCompile(`(?P<time>\d+\:\d+\:\d+)\s*` +
 		`\+` + `\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` +
 		`(?P<pid>\d+)` + `\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` +
 		`(?P<packageName>[^(]+)` + `\s*samplingPeriod=\s*` +
@@ -91,13 +91,13 @@ var (
 	// removeRegistrationRE is a regular expression to match the log that
 	// removes subscription in the sensorservice dump in the bugreport
 	// for Android starting from NRD42 and onwards.
-	removeRegistrationRE = regexp.MustCompile(`(?P<timeStamp>\d+\:\d+\:\d+)` +
+	removeRegistrationRE = regexp.MustCompile(`(?P<time>\d+\:\d+\:\d+)` +
 		`\s*` + `\-` + `\s*(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\s*pid=\s*` +
 		`(?P<pid>\d+)` + `\s*uid=\s*` + `(?P<uid>\d+)` + `\s*package=\s*` +
 		`(?P<packageName>[^(]+)`)
 
-	// timeLayoutRE is a regular expression to match the timestamp with dates
-	// that may show up in the bugreport.
+	// timeLayoutRE is a regular expression to match the time information with
+	// dates that may show up in the bugreport.
 	timeLayoutRE = regexp.MustCompile(`^(?P<month>\d+)\-(?P<day>\d+)`)
 )
 
@@ -107,9 +107,6 @@ const (
 	parseConnErrStr = "Parse Active Conn"
 	parseRegErrStr  = "Parse Registration"
 	sensorDump      = "Sensorservice Dump"
-	// unknownTime is used when the start or end time of an event is unknown.
-	// This is not zero as csv.AddEntryWithOpt ignores events with a zero time.
-	unknownTime = -1
 )
 
 // OutputData contains information for active connection and previous
@@ -162,13 +159,14 @@ type parser struct {
 	referenceDay int
 
 	// currentTime is the time extracted from the dumpstate line in a bugreport.
+	// It is in the traditional HH:MM:SS format.
 	referenceTime string
 
-	// earliestTimeSeen is the timestamp corresponding to the last event
-	// recorded in the Previous Registration section. If there is no previous
-	// registration section, ealiestTimeSeen is set to be the timestamp for
-	// referenceTime.
-	earliestTimeSeen int64
+	// earliestTimestampInMs is the timestamp corresponding to the last event
+	// recorded in the Previous Registration section.
+	// If there is no previous registration section, earliestTimestampInMs is
+	// set to be the timestamp in Ms for the referenceTime.
+	earliestTimestampInMs int64
 
 	// loc is the location parsed from timezone information in the bugreport.
 	// The previous registration is in the user's local timezone
@@ -275,9 +273,9 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
-	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
-	p.earliestTimeSeen = referenceTimestamp
+	p.earliestTimestampInMs = referenceTimestampInMs
 
 	for p.valid() {
 		l := p.line() // Read the current line and advance the line position.
@@ -477,7 +475,7 @@ func (p *parser) createActiveConnPBList() map[int32]*acpb.ActiveConn {
 // Note that the previous registration history records the subscription event
 // in reverse chronological order.
 func (p *parser) extractRegistrationHistory() ([]error, []error) {
-	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 	for p.valid() {
 		l := p.line()
@@ -493,40 +491,40 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			break
 		}
 
-		// Get the timestamp of the record.
-		// Accomodate the case where the timestamp includes date.
+		// Get the time of the record.
+		// Accomodate the case where the time information includes date.
 		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
-		var timestamp int64
+		var timestampInMs int64
 		var timestampErr error
 		if hasDate {
 			month, err := strconv.Atoi(date["month"])
 			if err != nil {
 				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("%s: error parsing timestamp for line %v: %v",
-						parseRegErrStr, l, timestampErr))
+					fmt.Errorf("%s: error parsing month information for "+
+						"line %v: %v", parseRegErrStr, l, timestampErr))
 				continue
 			}
 			day, err := strconv.Atoi(date["day"])
 			if err != nil {
 				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("%s: error parsing timestamp for line %v: %v",
-						parseRegErrStr, l, timestampErr))
+					fmt.Errorf("%s: error parsing day information for "+
+						"line %v: %v", parseRegErrStr, l, timestampErr))
 				continue
 			}
-			timestamp, timestampErr = p.fullTimestamp(month, day,
-				result["timeStamp"])
+			timestampInMs, timestampErr = p.fullTimestampInMs(month, day,
+				result["time"])
 		} else {
-			timestamp, timestampErr = p.fullTimestamp(p.referenceMonth,
-				p.referenceDay, result["timeStamp"])
+			timestampInMs, timestampErr = p.fullTimestampInMs(p.referenceMonth,
+				p.referenceDay, result["time"])
 		}
 		if timestampErr != nil {
 			p.parsingErrs = append(p.parsingErrs,
-				fmt.Errorf("%s: error parsing timestamp for line %v: %v",
+				fmt.Errorf("%s: error parsing time information for line %v: %v",
 					parseRegErrStr, l, timestampErr))
 			continue
 		}
-		if p.earliestTimeSeen > timestamp {
-			p.earliestTimeSeen = timestamp
+		if p.earliestTimestampInMs > timestampInMs {
+			p.earliestTimestampInMs = timestampInMs
 		}
 
 		// All registration history records information for
@@ -583,8 +581,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 				if conn, isActive := p.activeConns[identifier]; isActive {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
-					p.csvState.Print(sensorRegisDesc, "string", timestamp,
-						referenceTimestamp, value, "")
+					p.csvState.Print(sensorRegisDesc, "string", timestampInMs,
+						referenceTimestampInMs, value, "")
 					conn.HasSensorserviceRecord = true
 					p.activeConns[identifier] = conn
 				} else {
@@ -607,11 +605,11 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// The current activation statement can pair up with a
 					// previous de-activation statement to complete a
 					// subscription event.
-					eventInfo.StartMs = timestamp
+					eventInfo.StartMs = timestampInMs
 					eventInfo.SamplingPeriodUs = int32(samplingPeriodUs)
 					eventInfo.BatchingPeriodUs = int32(batchingPeriodUs)
 					p.csvState.Print(sensorRegisDesc, "string",
-						timestamp, eventInfo.EndMs, value, "")
+						timestampInMs, eventInfo.EndMs, value, "")
 				}
 			}
 		} else {
@@ -626,7 +624,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// a new subscription event.
 					eventInfo := &SubscriptionInfo{
 						StartMs:      -1,
-						EndMs:        timestamp,
+						EndMs:        timestampInMs,
 						SensorNumber: sensorNumber,
 						PackageName:  packageName,
 						Source:       sensorDump,
@@ -636,7 +634,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			} else {
 				eventInfo := &SubscriptionInfo{
 					StartMs:      -1,
-					EndMs:        timestamp,
+					EndMs:        timestampInMs,
 					SensorNumber: sensorNumber,
 					PackageName:  packageName,
 					Source:       sensorDump,
@@ -649,7 +647,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 	return p.parsingErrs, p.sensorErrs
 }
 
-// To sort the active connection information, the following interface is used.s
+// To sort the active connection information, the following interface is used.
 type activeConns []*acpb.ActiveConn
 
 func (slice activeConns) Len() int {
@@ -665,7 +663,7 @@ func (slice activeConns) Swap(i, j int) {
 }
 
 func (p parser) creatUnseenActiveConnectionHistory() {
-	referenceTimestamp, _ := p.fullTimestamp(p.referenceMonth,
+	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 
 	// Store all the active connections without history in a list and order
@@ -682,23 +680,21 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 		value := fmt.Sprintf("%d,%d,%s,%d,%d,%s", conn.SensorNumber, conn.UID,
 			conn.PackageName, conn.SamplingPeriodUs, conn.BatchingPeriodUs,
 			conn.Source)
-		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimeSeen,
-			referenceTimestamp, value, "")
+		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimestampInMs,
+			referenceTimestampInMs, value, "")
 	}
 }
 
-// This function is directly copied from the activity.go file.
 func validMonth(m int) bool {
 	return m >= int(time.January) && m <= int(time.December)
 }
 
-// This function is directly copied from the activity.go file.
-// fullTimestamp constructs the unix ms timestamp from the given date and
+// fullTimestampInMs constructs the unix ms timestamp from the given date and
 // time information.
 // Since previous registration events have no corresponding year,
 // we reconstruct the full timestamp using the stored reference year and
 // month extracted from the dumpstate line of the bug report.
-func (p *parser) fullTimestamp(month, day int, partialTimestamp string) (int64, error) {
+func (p *parser) fullTimestampInMs(month, day int, partialTimestamp string) (int64, error) {
 	remainder := "000"
 	if !validMonth(month) {
 		return 0, fmt.Errorf("invalid month: %d", month)
@@ -741,7 +737,6 @@ func (p *parser) fullTimestamp(month, day int, partialTimestamp string) (int64, 
 		remainder, p.loc)
 }
 
-// This function is directly copied froms the activity.go file.
 // msToTime converts milliseconds since Unix Epoch to a time.Time object.
 func msToTime(ms int64) time.Time {
 	return time.Unix(0, ms*int64(time.Millisecond))
