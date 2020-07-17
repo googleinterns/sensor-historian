@@ -351,22 +351,6 @@ historian.singleView_ = [
     tabSelector: '#tab-historian-sensor',
     container: '#historian-sensor',
     barOrder: [
-      {
-        source: historian.historianV2Logs.Sources.HEADING,
-        name: historian.metrics.Headings.CONTINUOUS
-      },
-      {
-        source: historian.historianV2Logs.Sources.HEADING,
-        name: historian.metrics.Headings.ON_CHANGE
-      },
-      {
-        source: historian.historianV2Logs.Sources.HEADING,
-        name: historian.metrics.Headings.ONE_SHOT
-      },
-      {
-        source: historian.historianV2Logs.Sources.HEADING,
-        name: historian.metrics.Headings.SPECIAL
-      },
     ],
     barHidden: [],
     logSources: [
@@ -374,8 +358,8 @@ historian.singleView_ = [
     ],
     logSourcesHidden: [],
     defaultLevelMetricOverride: '',  // Disable default level metric.
-    defaultXExtentLogs: [], // Fit any shown data.
-    showReportTaken: false
+    defaultXExtentLogs: [historian.historianV2Logs.Sources.SENSORSERVICE_DUMP],
+    showReportTaken: true
   }
 ];
 

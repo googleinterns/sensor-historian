@@ -274,10 +274,6 @@ historian.metrics.Headings = {
   HISTORICAL_BROADCASTS: 'Historical Broadcasts',
   MEMORY: 'Memory',
   PERFORMANCE: 'Performance',
-  CONTINUOUS: 'Continuous',
-  ON_CHANGE: 'On-change',
-  ONE_SHOT: 'One-shot',
-  SPECIAL: 'Special'
 };
 
 
