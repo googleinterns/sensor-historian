@@ -193,13 +193,13 @@ type SensorInfo struct {
 	Version, Number int32
 	// time.Duration in Golang is converted to nanoseconds in JS,
 	// so using int64 and naming convention to be clear in$
-	TotalTimeMs                int64
-	Count                      float32
-	RequestMode                string
-	MaxDelayInUs, MinDelayInUs int32
-	Batch                      bool
-	Max, Reserved              int32
-	WakeUp                     bool
+	TotalTimeMs            int64
+	Count                  float32
+	RequestMode            string
+	MaxDelayUs, MinDelayUs int32
+	Batch                  bool
+	Max, Reserved          int32
+	WakeUp                 bool
 }
 
 // ParseMetaInfo extracts the device ID, build fingerprint and model name
@@ -296,7 +296,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MaxDelayInUs = historianutils.RoundFloat(
+					curSensor.MaxDelayUs = historianutils.RoundFloat(
 						float64(1000000) / rate)
 				}
 			} else {
@@ -305,7 +305,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MaxDelayInUs = int32(delay)
+					curSensor.MaxDelayUs = int32(delay)
 				}
 			}
 			if strings.Contains(result["variableTwo"], "maxRate") {
@@ -314,7 +314,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinDelayInUs = historianutils.RoundFloat(
+					curSensor.MinDelayUs = historianutils.RoundFloat(
 						float64(1000000) / rate)
 				}
 			} else {
@@ -323,7 +323,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinDelayInUs = int32(delay)
+					curSensor.MinDelayUs = int32(delay)
 				}
 			}
 
@@ -388,7 +388,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MaxDelayInUs = historianutils.RoundFloat(
+					curSensor.MaxDelayUs = historianutils.RoundFloat(
 						float64(1000000) / rate)
 				}
 			} else {
@@ -397,7 +397,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MaxDelayInUs = int32(delay)
+					curSensor.MaxDelayUs = int32(delay)
 				}
 			}
 			if strings.Contains(result["variableTwo"], "maxRate") {
@@ -406,7 +406,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinDelayInUs = historianutils.RoundFloat(
+					curSensor.MinDelayUs = historianutils.RoundFloat(
 						float64(1000000) / rate)
 				}
 			} else {
@@ -415,7 +415,7 @@ Loop:
 					if err != nil {
 						return nil, err
 					}
-					curSensor.MinDelayInUs = int32(delay)
+					curSensor.MinDelayUs = int32(delay)
 				}
 			}
 
