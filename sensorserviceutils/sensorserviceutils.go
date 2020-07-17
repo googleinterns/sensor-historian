@@ -582,9 +582,9 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 
 					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 					end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s,%s", start, end,
-						sensorNumber, p.sensors[sensorNumber].RequestMode, uid,
-						packageName, samplingPeriodUs, batchingPeriodUs,
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s,%s", start,
+						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+						uid, packageName, samplingPeriodUs, batchingPeriodUs,
 						sensorDump, "isActiveConn")
 
 					p.csvState.Print(sensorName, "string", timestampMs,
@@ -617,9 +617,9 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					sensorName := p.sensors[sensorNumber].Name
 					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 					end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s", start, end,
-						sensorNumber, p.sensors[sensorNumber].RequestMode, uid,
-						packageName, samplingPeriodUs, batchingPeriodUs,
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s", start,
+						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+						uid, packageName, samplingPeriodUs, batchingPeriodUs,
 						sensorDump)
 					p.csvState.Print(sensorName, "string",
 						timestampMs, eventInfo.EndMs, value, "")
