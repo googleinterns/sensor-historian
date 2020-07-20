@@ -18,30 +18,6 @@ import (
 	"testing"
 )
 
-func TestRounding(t *testing.T) {
-	tests := []struct {
-		input float64
-		want  int32
-	}{
-		{input: 1.999,
-			want: 2},
-		{input: -1.999,
-			want: -2},
-		{input: 1.499,
-			want: 1},
-		{input: -1.499,
-			want: -1},
-		{input: 666666.667,
-			want: 666667},
-	}
-	for _, test := range tests {
-		result := RoundFloat(test.input)
-		if result != test.want {
-			t.Errorf("input:%v\n  got: %v\n  want: %v", test.input, result, test.want)
-		}
-	}
-}
-
 func TestScrubPII(t *testing.T) {
 	test := map[string]string{
 		"pureemail@google.com":   "XXX@google.com",

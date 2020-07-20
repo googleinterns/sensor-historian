@@ -134,13 +134,13 @@ type activeSensor struct {
 // For MNC or before: each subscription event is captured by
 // activated/de-activated statments.
 type SubscriptionInfo struct {
-	StartMs, EndMs   int64
-	SensorNumber     int32
-	UID              int32
-	PackageName      string
-	SamplingPeriodUs int32
-	BatchingPeriodUs int32
-	Source           string
+	StartMs, EndMs int64
+	SensorNumber   int32
+	UID            int32
+	PackageName    string
+	SamplingRateHz float64
+	BatchingRateHz float64
+	Source         string
 }
 
 type parser struct {
@@ -570,7 +570,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					parseRegErrStr, result["batchingPeriodUs"], l, err))
 				continue
 			}
-
+			samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
+			batchingRateHz := historianutils.PeriodUsToRateHz(batchingPeriodUs)
 			_, exist := p.history[identifier]
 			if !exist {
 				// If there is no history of de-activating a subscription,
@@ -582,9 +583,9 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 
 					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 					end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s,%s", start,
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start,
 						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
-						uid, packageName, samplingPeriodUs, batchingPeriodUs,
+						uid, packageName, samplingRateHz, batchingRateHz,
 						sensorDump, "isActiveConn")
 
 					p.csvState.Print(sensorName, "string", timestampMs,
@@ -612,14 +613,16 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// previous de-activation statement to complete a
 					// subscription event.
 					eventInfo.StartMs = timestampMs
-					eventInfo.SamplingPeriodUs = int32(samplingPeriodUs)
-					eventInfo.BatchingPeriodUs = int32(batchingPeriodUs)
+					samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
+					batchingRateHz := historianutils.PeriodUsToRateHz(batchingPeriodUs)
+					eventInfo.SamplingRateHz = samplingRateHz
+					eventInfo.BatchingRateHz = batchingRateHz
 					sensorName := p.sensors[sensorNumber].Name
 					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 					end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s", start,
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
 						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
-						uid, packageName, samplingPeriodUs, batchingPeriodUs,
+						uid, packageName, samplingRateHz, batchingRateHz,
 						sensorDump)
 					p.csvState.Print(sensorName, "string",
 						timestampMs, eventInfo.EndMs, value, "")
@@ -692,10 +695,14 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 	for _, conn := range connNoHistory {
 		start := msToTime(p.earliestTimestampMs).In(p.loc).Format(timeFormat)
 		end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-		value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%d,%d,%s,%s", start, end,
+		samplingRateHz := historianutils.PeriodUsToRateHz(
+			int(conn.SamplingPeriodUs))
+		batchingRateHz := historianutils.PeriodUsToRateHz(
+			int(conn.BatchingPeriodUs))
+		value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start, end,
 			conn.SensorNumber, p.sensors[conn.SensorNumber].RequestMode,
-			conn.UID, conn.PackageName, conn.SamplingPeriodUs,
-			conn.BatchingPeriodUs, conn.Source, "isActiveConn")
+			conn.UID, conn.PackageName, samplingRateHz,
+			batchingRateHz, conn.Source, "isActiveConn")
 		sensorName := p.sensors[conn.SensorNumber].Name
 		p.csvState.Print(sensorName, "string", p.earliestTimestampMs,
 			referenceTimestampMs, value, "")
