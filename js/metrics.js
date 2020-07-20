@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -273,7 +273,7 @@ historian.metrics.Headings = {
   ACTIVE_BROADCASTS: 'Active Broadcasts',
   HISTORICAL_BROADCASTS: 'Historical Broadcasts',
   MEMORY: 'Memory',
-  PERFORMANCE: 'Performance',
+  PERFORMANCE: 'Performance'
 };
 
 
