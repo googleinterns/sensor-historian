@@ -1628,18 +1628,41 @@ historian.Bars.prototype.createSortedTable_ = function(series, cluster) {
  */
 historian.Bars.prototype.createSensorTable_ = function(values){
   var headRow = [
+    'Start',
+    'End',
     'UID',
     'Package Name',
-    'Sampling Period(us)',
-    'Batching Period(us)',
-    'Source',
-    'Total Duration'
   ];
-  var bodyRows = values.map(function(entry) {
-    var parts = entry.value.split(',');
+  if (!values[0].value.includes("one-shot")){
+    headRow.push('Sampling Period(us)');
+    headRow.push('Batching Period(us)');
+  }
+  headRow.push('Source');
+  headRow.push('Total Duration');
+
+  var highlightedBodyRows = []
+
+  var bodyRows = values.map(function(entry, index) {
+    var v = entry.value.split(',');
     var duration = historian.time.formatDuration(entry.duration);
-    return [parts[1], parts[2], parts[3], parts[4], parts[5], duration];
+    // Highlight the row related to active connection.
+    if (v[v.length - 1] == "isActiveConn"){
+      highlightedBodyRows.push(index)
+    }
+    return headRow.length > 6 ? 
+    [v[0], v[1], v[4], v[5], v[6], v[7], v[8], duration] :
+    [v[0], v[1], v[4], v[5], v[8], duration];
   });
+
+  highlightedBodyRows.forEach(function(row){
+    bodyRows[row].forEach(function(value, col){
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'highlighted-cell'
+      }
+    });
+  });
+
   return {header: headRow, body: bodyRows};
 };
 

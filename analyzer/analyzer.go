@@ -134,12 +134,11 @@ type uploadResponse struct {
 	// early and should be shown prominently to the user.
 	CriticalError string `json:"criticalError"`
 	// A message to show to the user that they should be aware of.
-	Note        string           `json:"note"`
-	FileName    string           `json:"fileName"`
-	Location    string           `json:"location"`
-	OverflowMs  int64            `json:"overflowMs"`
-	IsDiff      bool             `json:"isDiff"`
-	SensorsInfo map[int32]string `json:"sensorsInfo"`
+	Note       string `json:"note"`
+	FileName   string `json:"fileName"`
+	Location   string `json:"location"`
+	OverflowMs int64  `json:"overflowMs"`
+	IsDiff     bool   `json:"isDiff"`
 }
 
 type uploadResponseCompare struct {
@@ -972,7 +971,6 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			Location:        late.dt.Location().String(),
 			OverflowMs:      summariesOutput.overflowMs,
 			IsDiff:          diff,
-			SensorsInfo:     sensorserviceOutput.SensorsInfo,
 		})
 		pd.data = append(pd.data, data)
 
