@@ -1634,8 +1634,8 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     'Package Name',
   ];
   if (!values[0].value.includes("one-shot")){
-    headRow.push('Sampling Period(us)');
-    headRow.push('Batching Period(us)');
+    headRow.push('Sampling Rate(Hz)');
+    headRow.push('Batching Rate(Hz)');
   }
   headRow.push('Source');
   headRow.push('Total Duration');
@@ -1649,8 +1649,10 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     if (v[v.length - 1] == "isActiveConn"){
       highlightedBodyRows.push(index)
     }
+    var batching = v[7] == "-1.00"? "No batching" : v[7];
+    
     return headRow.length > 6 ? 
-    [v[0], v[1], v[4], v[5], v[6], v[7], v[8], duration] :
+    [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
     [v[0], v[1], v[4], v[5], v[8], duration];
   });
 
