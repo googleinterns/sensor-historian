@@ -134,13 +134,13 @@ type activeSensor struct {
 // For MNC or before: each subscription event is captured by
 // activated/de-activated statments.
 type SubscriptionInfo struct {
-	StartMs, EndMs   int64
-	SensorNumber     int32
-	UID              int32
-	PackageName      string
-	SamplingPeriodUs int32
-	BatchingPeriodUs int32
-	Source           string
+	StartMs, EndMs int64
+	SensorNumber   int32
+	UID            int32
+	PackageName    string
+	SamplingRateHz float64
+	BatchingRateHz float64
+	Source         string
 }
 
 type parser struct {
@@ -162,11 +162,11 @@ type parser struct {
 	// It is in the traditional HH:MM:SS format.
 	referenceTime string
 
-	// earliestTimestampInMs is the timestamp corresponding to the last event
+	// earliestTimestampMs is the timestamp corresponding to the last event
 	// recorded in the Previous Registration section.
-	// If there is no previous registration section, earliestTimestampInMs is
+	// If there is no previous registration section, earliestTimestampMs is
 	// set to be the timestamp in Ms for the referenceTime.
-	earliestTimestampInMs int64
+	earliestTimestampMs int64
 
 	// loc is the location parsed from timezone information in the bugreport.
 	// The previous registration is in the user's local timezone
@@ -273,9 +273,9 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		history:        make(map[string]*SubscriptionInfo),
 		sensors:        meta.Sensors,
 	}
-	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
-	p.earliestTimestampInMs = referenceTimestampInMs
+	p.earliestTimestampMs = referenceTimestampMs
 
 	for p.valid() {
 		l := p.line() // Read the current line and advance the line position.
@@ -475,7 +475,7 @@ func (p *parser) createActiveConnPBList() map[int32]*acpb.ActiveConn {
 // Note that the previous registration history records the subscription event
 // in reverse chronological order.
 func (p *parser) extractRegistrationHistory() ([]error, []error) {
-	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 	for p.valid() {
 		l := p.line()
@@ -494,7 +494,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 		// Get the time of the record.
 		// Accomodate the case where the time information includes date.
 		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
-		var timestampInMs int64
+		var timestampMs int64
 		var timestampErr error
 		if hasDate {
 			month, err := strconv.Atoi(date["month"])
@@ -511,10 +511,10 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 						"line %v: %v", parseRegErrStr, l, timestampErr))
 				continue
 			}
-			timestampInMs, timestampErr = p.fullTimestampInMs(month, day,
+			timestampMs, timestampErr = p.fullTimestampInMs(month, day,
 				result["time"])
 		} else {
-			timestampInMs, timestampErr = p.fullTimestampInMs(p.referenceMonth,
+			timestampMs, timestampErr = p.fullTimestampInMs(p.referenceMonth,
 				p.referenceDay, result["time"])
 		}
 		if timestampErr != nil {
@@ -523,8 +523,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					parseRegErrStr, l, timestampErr))
 			continue
 		}
-		if p.earliestTimestampInMs > timestampInMs {
-			p.earliestTimestampInMs = timestampInMs
+		if p.earliestTimestampMs > timestampMs {
+			p.earliestTimestampMs = timestampMs
 		}
 
 		// All registration history records information for
@@ -554,7 +554,6 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 		}
 		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
 
-		var value string
 		if isAdd {
 			// Currently processing an activated statement.
 			samplingPeriodUs, err := strconv.Atoi(result["samplingPeriodUs"])
@@ -571,9 +570,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					parseRegErrStr, result["batchingPeriodUs"], l, err))
 				continue
 			}
-			value = fmt.Sprintf("%d,%d,%s,%d,%d,%s", sensorNumber, uid,
-				packageName, samplingPeriodUs, batchingPeriodUs, sensorDump)
-
+			samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
+			batchingRateHz := historianutils.PeriodUsToRateHz(batchingPeriodUs)
 			_, exist := p.history[identifier]
 			if !exist {
 				// If there is no history of de-activating a subscription,
@@ -581,8 +579,17 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 				if conn, isActive := p.activeConns[identifier]; isActive {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
-					p.csvState.Print(sensorRegisDesc, "string", timestampInMs,
-						referenceTimestampInMs, value, "")
+					sensorName := p.sensors[sensorNumber].Name
+
+					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
+					end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start,
+						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+						uid, packageName, samplingRateHz, batchingRateHz,
+						sensorDump, "isActiveConn")
+
+					p.csvState.Print(sensorName, "string", timestampMs,
+						referenceTimestampMs, value, "")
 					conn.HasSensorserviceRecord = true
 					p.activeConns[identifier] = conn
 				} else {
@@ -605,11 +612,20 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// The current activation statement can pair up with a
 					// previous de-activation statement to complete a
 					// subscription event.
-					eventInfo.StartMs = timestampInMs
-					eventInfo.SamplingPeriodUs = int32(samplingPeriodUs)
-					eventInfo.BatchingPeriodUs = int32(batchingPeriodUs)
-					p.csvState.Print(sensorRegisDesc, "string",
-						timestampInMs, eventInfo.EndMs, value, "")
+					eventInfo.StartMs = timestampMs
+					samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
+					batchingRateHz := historianutils.PeriodUsToRateHz(batchingPeriodUs)
+					eventInfo.SamplingRateHz = samplingRateHz
+					eventInfo.BatchingRateHz = batchingRateHz
+					sensorName := p.sensors[sensorNumber].Name
+					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
+					end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
+					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
+						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+						uid, packageName, samplingRateHz, batchingRateHz,
+						sensorDump)
+					p.csvState.Print(sensorName, "string",
+						timestampMs, eventInfo.EndMs, value, "")
 				}
 			}
 		} else {
@@ -624,7 +640,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// a new subscription event.
 					eventInfo := &SubscriptionInfo{
 						StartMs:      -1,
-						EndMs:        timestampInMs,
+						EndMs:        timestampMs,
 						SensorNumber: sensorNumber,
 						PackageName:  packageName,
 						Source:       sensorDump,
@@ -634,7 +650,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			} else {
 				eventInfo := &SubscriptionInfo{
 					StartMs:      -1,
-					EndMs:        timestampInMs,
+					EndMs:        timestampMs,
 					SensorNumber: sensorNumber,
 					PackageName:  packageName,
 					Source:       sensorDump,
@@ -663,7 +679,7 @@ func (slice activeConns) Swap(i, j int) {
 }
 
 func (p parser) creatUnseenActiveConnectionHistory() {
-	referenceTimestampInMs, _ := p.fullTimestampInMs(p.referenceMonth,
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 
 	// Store all the active connections without history in a list and order
@@ -677,11 +693,19 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 	sort.Sort(connNoHistory)
 
 	for _, conn := range connNoHistory {
-		value := fmt.Sprintf("%d,%d,%s,%d,%d,%s", conn.SensorNumber, conn.UID,
-			conn.PackageName, conn.SamplingPeriodUs, conn.BatchingPeriodUs,
-			conn.Source)
-		p.csvState.Print(sensorRegisDesc, "string", p.earliestTimestampInMs,
-			referenceTimestampInMs, value, "")
+		start := msToTime(p.earliestTimestampMs).In(p.loc).Format(timeFormat)
+		end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
+		samplingRateHz := historianutils.PeriodUsToRateHz(
+			int(conn.SamplingPeriodUs))
+		batchingRateHz := historianutils.PeriodUsToRateHz(
+			int(conn.BatchingPeriodUs))
+		value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start, end,
+			conn.SensorNumber, p.sensors[conn.SensorNumber].RequestMode,
+			conn.UID, conn.PackageName, samplingRateHz,
+			batchingRateHz, conn.Source, "isActiveConn")
+		sensorName := p.sensors[conn.SensorNumber].Name
+		p.csvState.Print(sensorName, "string", p.earliestTimestampMs,
+			referenceTimestampMs, value, "")
 	}
 }
 
