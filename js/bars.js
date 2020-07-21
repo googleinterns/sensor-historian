@@ -1645,22 +1645,22 @@ historian.Bars.prototype.createSensorTable_ = function(values){
 
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
+    console.log(v)
     var duration = historian.time.formatDuration(entry.duration);
+    // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
       highlightActiveConn.push(index)
     }
     
     var batching = (v[7] == "-1.00" || v[7] == "0.00")? "Not Batching" : v[7];
-    var sampling = (v[6] == "-1.00" || v[6] == "0.00")? "Not Sampling" : v[6];
 
-    // Highlight the cell showing "Not Sampling" since this is an error.
-    // Highlight the row related to active connection.
-    if (sampling == "Not Sampling"){
+    // Highlight the cell showing sampling rate = -1 or 0.
+    if (v[6] == "-1.00" || v[6] == "0.00"){
       highlightSampling.push(index)
     }
     
     return headRow.length > 6 ? 
-    [v[0], v[1], v[4], v[5], sampling, batching, v[8], duration] :
+    [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
     [v[0], v[1], v[4], v[5], v[8], duration];
   });
 
@@ -1669,27 +1669,16 @@ historian.Bars.prototype.createSensorTable_ = function(values){
       bodyRows[row][col] = {
         value: value,
         classes: 'activeConn-cell'
-      }
-      if (value == "Not Sampling"){
-        bodyRows[row][col] = {
-          value: value,
-          classes: 'highlighted-cell'
-        } 
-      }   
+      };
     });
   });
-  // TO DO: there is a bug where if the active connection info has a
-  // "Not Sampling" field, the change of color can only achieved 
-  // by line 1673-1676
+
   highlightSampling.forEach(function(row){
-    bodyRows[row].forEach(function(value, col){
-      if (value == "Not Sampling"){
-        bodyRows[row][col] = {
-          value: value,
-          classes: 'highlighted-cell'
-        }  
-      }
-    });
+    // For cells with sampling rate = -1 or 0, show "Not Sampling" instead.
+    bodyRows[row][4] = {
+      value: "Not Sampling",
+      classes: 'highlighted-cell'
+    };
   });
 
   return {header: headRow, body: bodyRows};
