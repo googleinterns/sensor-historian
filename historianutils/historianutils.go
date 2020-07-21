@@ -110,9 +110,13 @@ func MaxInt64(a int64, b int64) int64 {
 	return b
 }
 
-// RoundFloat returns the closest integer to the given float number.
-func RoundFloat(val float64) int32 {
-	return int32(math.Round(val))
+// PeriodUsToRateHz takes in the period in us and returns the frequency in Hz.
+// Note that if period is 0 or -1, then the rate is set to be -1.
+func PeriodUsToRateHz(period int) float64 {
+	if period == 0 || period == -1 {
+		return -1
+	}
+	return math.Round(100/(1e-06*float64(period))) / 100
 }
 
 // ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
