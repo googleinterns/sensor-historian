@@ -20,6 +20,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"math"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -113,9 +114,9 @@ func MaxInt64(a int64, b int64) int64 {
 // Note that if period is 0 or -1, then the rate is set to be -1.
 func PeriodUsToRateHz(period int) float64 {
 	if period == 0 || period == -1 {
-		return -1.0
+		return -1
 	}
-	return 1.0 / (1e-06 * float64(period))
+	return math.Round(100/(1e-06*float64(period))) / 100
 }
 
 // ParseDurationWithDays parses a duration string and returns the milliseconds. e.g. 3d1h2m
