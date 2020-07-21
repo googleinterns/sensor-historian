@@ -932,7 +932,7 @@ func TestParseSet1(t *testing.T) {
 			wantSensorErrors: []error{
 				fmt.Errorf("[Invalid Activation]: connection between pkg(DD) and sensor(1) should be active"),
 				fmt.Errorf("[Multiple De-Activation]: for pkg(CCC) and sensor(24)"),
-				fmt.Errorf("[Multiple Activation]: for pkg(BB) and sensor(4)"),
+				fmt.Errorf("[Invalid Activation]: connection between pkg(BB) and sensor(4) should be active"),
 			},
 		},
 	}

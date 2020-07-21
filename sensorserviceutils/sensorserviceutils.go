@@ -307,7 +307,6 @@ func constructSensorName(nameStr, typeStr string, number int32) string {
 func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
 	sensorCheck := make(map[string][]int32, len(sensors))
 	for curNum, sensorInfo := range sensors {
-		fmt.Println(curNum, sensorCheck)
 		curSensorName := sensorInfo.Name
 		conflictName := sensorInfo.Name
 		if oldNums, exist := sensorCheck[curSensorName]; exist {
@@ -347,7 +346,6 @@ func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
 					}
 				}
 				p.sensors[oldNum].Name = oldSensorName
-				fmt.Println(oldNum, oldNameHasNum, oldSensorName)
 			}
 		} else {
 			collision := make([]int32, 0)
@@ -372,8 +370,6 @@ func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
 			ActiveConns:   make([]*sipb.ActiveConn, 1),
 		}
 		p.sensors[curNum] = sensor
-		fmt.Println(curNum, sensorCheck)
-		fmt.Println(curNum, curSensorName)
 	}
 }
 
@@ -697,7 +693,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			if !exist {
 				// If there is no history of de-activating a subscription,
 				// the subscription has to be active.
-				if conn, isActive := p.activeConns[identifier]; isActive {
+				conn, isActive := p.activeConns[identifier]
+				if isActive && !conn.HasSensorserviceRecord {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
 					sensorName := p.sensors[sensorNumber].Name
@@ -769,6 +766,7 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 						sensorDump)
 					p.csvState.Print(sensorName, "string",
 						timestampMs, eventInfo.EndMs, value, "")
+					delete(p.history, identifier)
 				}
 			}
 		} else {

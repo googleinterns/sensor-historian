@@ -1633,9 +1633,9 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     'UID',
     'Package Name',
   ];
-  if (!values[0].value.includes("one-shot")){
+  if (!values[0].value.includes("ONE_SHOT")){
     headRow.push('Sampling Rate(Hz)');
-    headRow.push('Batching Rate(Hz)');
+    headRow.push('Batching Period(s)');
   }
   headRow.push('Source');
   headRow.push('Total Duration');
@@ -1649,19 +1649,34 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     if (v[v.length - 1] == "isActiveConn"){
       highlightedBodyRows.push(index)
     }
-    var batching = v[7] == "-1.00"? "No batching" : v[7];
+    
+    var batching = (v[7] == "-1.00" || v[7] == "0.00")? "Not Batching" : v[7];
+    var sampling = (v[6] == "-1.00" || v[6] == "0.00")? "Not Sampling" : v[6];
+
+    // Highlight the cell showing "Not Sampling" since this is an error.
+    if (sampling == "Not Sampling"){
+      highlightedBodyRows.push(index)
+    }
     
     return headRow.length > 6 ? 
-    [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
+    [v[0], v[1], v[4], v[5], sampling, batching, v[8], duration] :
     [v[0], v[1], v[4], v[5], v[8], duration];
   });
 
   highlightedBodyRows.forEach(function(row){
     bodyRows[row].forEach(function(value, col){
-      bodyRows[row][col] = {
-        value: value,
-        classes: 'highlighted-cell'
-      }
+      if (value == "Not Sampling"){
+        bodyRows[row][col] = {
+          value: value,
+          classes: 'highlighted-cell'
+        }
+      }else{
+        console.log(value, typeof value)
+        bodyRows[row][col] = {
+          value: value,
+          classes: 'activeConn-cell'
+        }
+      }      
     });
   });
 
