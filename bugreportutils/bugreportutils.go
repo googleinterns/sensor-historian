@@ -195,7 +195,7 @@ type SensorInfo struct {
 	// so using int64 and naming convention to be clear in$
 	TotalTimeMs          int64
 	Count                float32
-	RequestMode          string
+	RequestMode          int32
 	MaxRateHz, MinRateHz float64
 	Batch                bool
 	Max, Reserved        int32
@@ -347,7 +347,7 @@ Loop:
 
 			curSensor.Name = result["sensorName"]
 			curSensor.Type = result["sensorTypeString"]
-			curSensor.RequestMode = result["requestMode"]
+			curSensor.RequestMode = returnRequestMode(result["requestMode"])
 			sensors[int32(n)] = curSensor
 			continue
 		}
@@ -377,7 +377,7 @@ Loop:
 			sensors[curNum] = curSensor
 		} else if line2, result := historianutils.SubexpNames(sensorLine2RE, line); line2 {
 			curSensor := sensors[curNum]
-			curSensor.RequestMode = result["requestMode"]
+			curSensor.RequestMode = returnRequestMode(result["requestMode"])
 
 			// Convert the minRate/maxRate in Hz to maxDelay/minDelay in us.
 			if strings.Contains(result["variableOne"], "minRate") {
@@ -451,6 +451,18 @@ Loop:
 	}
 
 	return sensors, nil
+}
+
+func returnRequestMode(mode string) int32 {
+	if mode == "continuous" {
+		return 0
+	} else if mode == "on-change" {
+		return 1
+	} else if mode == "one-shot" {
+		return 2
+	} else {
+		return 3
+	}
 }
 
 // ExtractBatterystatsCheckin extracts and returns only the lines in
