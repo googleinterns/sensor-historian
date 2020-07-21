@@ -1651,11 +1651,12 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     if (v[v.length - 1] == "isActiveConn"){
       highlightActiveConn.push(index)
     }
-    
+
+    var isOneShot = (headRow.length > 6)? false: true;
     var batching = (v[7] == "-1.00" || v[7] == "0.00")? "Not Batching" : v[7];
 
     // Highlight the cell showing sampling rate = -1 or 0.
-    if (v[6] == "-1.00" || v[6] == "0.00"){
+    if (!isOneShot && (v[6] == "-1.00" || v[6] == "0.00")){
       highlightSampling.push(index)
     }
     
