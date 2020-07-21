@@ -1640,22 +1640,23 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   headRow.push('Source');
   headRow.push('Total Duration');
 
-  var highlightedBodyRows = []
+  var highlightActiveConn = []
+  var highlightSampling = []
 
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
     var duration = historian.time.formatDuration(entry.duration);
-    // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
-      highlightedBodyRows.push(index)
+      highlightActiveConn.push(index)
     }
     
     var batching = (v[7] == "-1.00" || v[7] == "0.00")? "Not Batching" : v[7];
     var sampling = (v[6] == "-1.00" || v[6] == "0.00")? "Not Sampling" : v[6];
 
     // Highlight the cell showing "Not Sampling" since this is an error.
+    // Highlight the row related to active connection.
     if (sampling == "Not Sampling"){
-      highlightedBodyRows.push(index)
+      highlightSampling.push(index)
     }
     
     return headRow.length > 6 ? 
@@ -1663,20 +1664,31 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     [v[0], v[1], v[4], v[5], v[8], duration];
   });
 
-  highlightedBodyRows.forEach(function(row){
+  highlightActiveConn.forEach(function(row){
+    bodyRows[row].forEach(function(value, col){
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'activeConn-cell'
+      }
+      if (value == "Not Sampling"){
+        bodyRows[row][col] = {
+          value: value,
+          classes: 'highlighted-cell'
+        } 
+      }   
+    });
+  });
+  // TO DO: there is a bug where if the active connection info has a
+  // "Not Sampling" field, the change of color can only achieved 
+  // by line 1673-1676
+  highlightSampling.forEach(function(row){
     bodyRows[row].forEach(function(value, col){
       if (value == "Not Sampling"){
         bodyRows[row][col] = {
           value: value,
           classes: 'highlighted-cell'
-        }
-      }else{
-        console.log(value, typeof value)
-        bodyRows[row][col] = {
-          value: value,
-          classes: 'activeConn-cell'
-        }
-      }      
+        }  
+      }
     });
   });
 

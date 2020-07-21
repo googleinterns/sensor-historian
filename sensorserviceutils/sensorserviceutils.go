@@ -572,7 +572,6 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 						"[Active Connection]: connection(%d): the sensor(%d)"+
 							" is not active according to the sensor device"+
 							" section", curConnNum, sensorNumber))
-					continue
 				}
 			}
 		}
@@ -691,8 +690,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			batchingPeriodS := math.Round(float64(batchingPeriodUs)*1e-04) / 100
 			_, exist := p.history[identifier]
 			if !exist {
-				// If there is no history of de-activating a subscription,
-				// the subscription has to be active.
+				// If there is no history of this subscription,
+				// the connection has to be active.
 				conn, isActive := p.activeConns[identifier]
 				if isActive && !conn.HasSensorserviceRecord {
 					// For active connection, set current time as the end time
@@ -789,6 +788,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					p.history[identifier] = eventInfo
 				}
 			} else {
+				// Nothing for this subscription event has been seen,
+				// this de-activation statement is the first one related to it.
 				eventInfo := &sipb.SubscriptionInfo{
 					StartMs:      -1,
 					EndMs:        timestampMs,
