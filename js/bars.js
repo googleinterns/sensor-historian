@@ -1645,7 +1645,6 @@ historian.Bars.prototype.createSensorTable_ = function(values){
 
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
-    console.log(v)
     var duration = historian.time.formatDuration(entry.duration);
     // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
