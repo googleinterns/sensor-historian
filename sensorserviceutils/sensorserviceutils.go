@@ -114,7 +114,7 @@ const (
 // registration history collected in the sensorservice dump.
 type OutputData struct {
 	CSV         string
-	ActiveConns map[int32]*sipb.ActiveConn
+	SensorInfo  *sipb.AllSensorsInfo
 	ParsingErrs []error
 	SensorErrs  []error
 }
@@ -257,6 +257,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		history:        make(map[string]*sipb.SubscriptionInfo),
 		sensors:        make(map[int32]*sipb.Sensor),
 	}
+	p.updateSensorsInfo(meta.Sensors)
 	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 	p.earliestTimestampMs = referenceTimestampMs
@@ -281,8 +282,124 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	}
 	p.creatUnseenActiveConnectionHistory()
 
-	return OutputData{p.buf.String(), p.createActiveConnPBList(),
+	return OutputData{p.buf.String(), p.allSensorInfo(),
 		p.parsingErrs, p.sensorErrs}
+}
+
+func constructSensorName(nameStr, typeStr string, number int32) string {
+	var newName string
+	typeMap := strings.Split(typeStr, ".")
+	if number != -1 {
+		// There are sensors with the same name and type, add sensor number
+		// to its name.
+		newName = fmt.Sprintf("%d.%s (%s)",
+			number, nameStr, typeMap[len(typeMap)-1])
+	} else {
+		newName = fmt.Sprintf("%s (%s)", nameStr, typeMap[len(typeMap)-1])
+	}
+	return newName
+}
+
+func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
+	sensorCheck := make(map[string][]int32, len(sensors))
+	for curNum, sensorInfo := range sensors {
+		curSensorName := sensorInfo.Name
+		conflictName := sensorInfo.Name
+		if oldNums, exist := sensorCheck[curSensorName]; exist {
+			// Check for sensors that share the same name.
+			// If a collision exists, rename the sensor to include its type and
+			// sensor number if necessary
+			// e.g. consider the following three sensors, they are renamed to:
+			// 0x00000007 nameA typeA --> 7) nameA (typeA)
+			// 0x00000008 nameA typeB --> nameA (typeB)
+			// 0x00000009 nameA typeA --> 9) nameA(typeA)
+			curType := sensorInfo.Type
+			newNameHasNum := false
+			for _, oldNum := range oldNums {
+				oldType := p.sensors[oldNum].Type
+				oldSensorName := p.sensors[oldNum].Name
+				oldNameHasNum := strings.Contains(oldSensorName, ".")
+				if newNameHasNum != true {
+					// Once the name includes the sensor number, it is for sure
+					// a unique name since no two sensors should have the same
+					// number.
+					if curType == oldType {
+						newNameHasNum = true
+						curSensorName = constructSensorName(conflictName,
+							curType, curNum)
+					} else {
+						curSensorName = constructSensorName(conflictName,
+							curType, -1)
+					}
+				}
+				if !oldNameHasNum {
+					if curType == oldType {
+						oldSensorName = constructSensorName(conflictName,
+							oldType, oldNum)
+					} else {
+						oldSensorName = constructSensorName(conflictName,
+							oldType, -1)
+					}
+				}
+				p.sensors[oldNum].Name = oldSensorName
+			}
+		} else {
+			collision := make([]int32, 0)
+			sensorCheck[curSensorName] = collision
+		}
+		collisions := sensorCheck[conflictName]
+		collisions = append(collisions, curNum)
+		sensorCheck[conflictName] = collisions
+		sensor := &sipb.Sensor{
+			Name:          curSensorName,
+			Type:          sensorInfo.Type,
+			Version:       sensorInfo.Version,
+			Number:        sensorInfo.Number,
+			RequestMode:   sipb.RequestMode(sensorInfo.RequestMode),
+			MaxRateHz:     sensorInfo.MaxRateHz,
+			MinRateHz:     sensorInfo.MinRateHz,
+			Batch:         sensorInfo.Batch,
+			Max:           sensorInfo.Max,
+			Reserved:      sensorInfo.Reserved,
+			WakeUp:        sensorInfo.WakeUp,
+			Subscriptions: make([]*sipb.SubscriptionInfo, 1),
+			ActiveConns:   make([]*sipb.ActiveConn, 1),
+		}
+		p.sensors[curNum] = sensor
+	}
+}
+
+// To sort sensor information by sensor number, the following interface is used.
+type sensors []*sipb.Sensor
+
+func (slice sensors) Len() int {
+	return len(slice)
+}
+func (slice sensors) Less(i, j int) bool {
+	return slice[i].Number < slice[j].Number
+}
+func (slice sensors) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func (p parser) allSensorInfo() *sipb.AllSensorsInfo {
+	allActiveConns := make(activeConns, 0, len(p.activeConns))
+	for _, conn := range p.activeConns {
+		allActiveConns = append(allActiveConns, conn)
+	}
+	sort.Sort(allActiveConns)
+
+	allSensors := make(sensors, 0, len(p.sensors))
+	for _, sensorInfo := range p.sensors {
+		allSensors = append(allSensors, sensorInfo)
+	}
+	sort.Sort(allSensors)
+
+	return &sipb.AllSensorsInfo{
+		AllActiveConns: allActiveConns,
+		Sensors:        allSensors,
+		Apps:           nil,
+	}
 }
 
 // extractActiveConnInfo extracts information for active sensors found in
@@ -447,16 +564,6 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 	return p.parsingErrs, p.sensorErrs
 }
 
-// createActiveConnPBList creates a list of active connection information
-// based on the map built while parsing sensorservice dump.
-func (p *parser) createActiveConnPBList() map[int32]*sipb.ActiveConn {
-	activeConnections := make(map[int32]*sipb.ActiveConn)
-	for _, conn := range p.activeConns {
-		activeConnections[conn.Number] = conn
-	}
-	return activeConnections
-}
-
 // extractRegistrationHistory extracts all previous registration information
 // found in the sensorservice dump of a bug report.
 // Note that the previous registration history records the subscription event
@@ -567,6 +674,30 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					// For active connection, set current time as the end time
 					// for the ongoing subscription event.
 					sensorName := p.sensors[sensorNumber].Name
+					if samplingRateHz != conn.SamplingRateHz {
+						p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+							"[Active Sensor]: active connection for pkg(%s) "+
+								"and sensor(%d) shows two sampling rate(Hz):"+
+								" %.2f at active sensor section; %.2f at "+
+								"history section", packageName, sensorNumber,
+							conn.SamplingRateHz, samplingRateHz))
+						if conn.SamplingRateHz == -1 {
+							p.activeConns[identifier].SamplingRateHz =
+								samplingRateHz
+						}
+					}
+					if batchingPeriodS != conn.BatchingPeriodS {
+						p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+							"[Active Sensor]: active connection for pkg(%s) "+
+								"and sensor(%d) shows two batching period(s):"+
+								" %.2f at active sensor section; %.2f at "+
+								"history section", packageName, sensorNumber,
+							conn.BatchingPeriodS, batchingPeriodS))
+						if conn.BatchingPeriodS == -1 {
+							p.activeConns[identifier].BatchingPeriodS =
+								batchingPeriodS
+						}
+					}
 
 					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 					end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
