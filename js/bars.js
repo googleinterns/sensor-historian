@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1257,6 +1257,9 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     case historian.metrics.Csv.STRICT_MODE_VIOLATION:
       return this.createSortedTable_(series.name, cluster);
     default:
+      if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        return this.createSensorTable_(cluster.getSortedValues(false));
+      }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1264,6 +1267,57 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
           series, cluster.getSortedValues(
           series.name == historian.metrics.KERNEL_UPTIME), cluster);
   }
+};
+
+/**
+ * Creates a table to display the sensor entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorTable_ = function(values){
+  var headRow = [
+    'Start',
+    'End',
+    'UID',
+    'Package Name',
+  ];
+  if (!values[0].value.includes("one-shot")){
+    headRow.push('Sampling Rate(Hz)');
+    headRow.push('Batching Rate(Hz)');
+  }
+  headRow.push('Source');
+  headRow.push('Total Duration');
+
+  var highlightedBodyRows = []
+
+  var bodyRows = values.map(function(entry, index) {
+    var v = entry.value.split(',');
+    var duration = historian.time.formatDuration(entry.duration);
+    // Highlight the row related to active connection.
+    if (v[v.length - 1] == "isActiveConn"){
+      highlightedBodyRows.push(index)
+    }
+    var batching = v[7] == "-1.00"? "No batching" : v[7];
+
+    return headRow.length > 6 ? 
+    [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
+    [v[0], v[1], v[4], v[5], v[8], duration];
+  });
+
+  highlightedBodyRows.forEach(function(row){
+    bodyRows[row].forEach(function(value, col){
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'highlighted-cell'
+      }
+    });
+  });
+
+  return {header: headRow, body: bodyRows};
 };
 
 
