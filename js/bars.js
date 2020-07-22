@@ -782,9 +782,9 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         if (series.source == 
           historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
             var scale = bar.clusteredCount;
-            if (bar.clusteredCount > 5){
-              // TODO: 5 is a temp limit.
-              scale = 5;
+            if (bar.clusteredCount > 8){
+              // TODO: 8 is a temp limit.
+              scale = 8;
             }
             var baseColor = series.color(scale);
             // TODO: Use Opacity of color to indicate sampling rate.
@@ -1313,15 +1313,16 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     if (v[v.length - 1] == "isActiveConn"){
       highlightActiveConn.push(index)
     }
-
-    var batching = v[7] == "-1.00"? "Not batching" : v[7];
+    // Batching Period = -1 is a default value set for active connections 
+    // without a history.
+    var batching = (v[7] == "-1.00") || (v[7] == "0.00")? "Not batching" : v[7];
 
     return headRow.length > 6 ? 
     [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
     [v[0], v[1], v[4], v[5], v[8], duration];
   });
 
-  highlightedBodyRows.forEach(function(row){
+  highlightActiveConn.forEach(function(row){
     bodyRows[row].forEach(function(value, col){
       bodyRows[row][col] = {
         value: value,

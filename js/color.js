@@ -505,7 +505,10 @@ historian.color.generateSeriesColors = function(groups) {
       // Handle sensor activities color.
       // TODO: check the most suitable color scheme for accessibility.
       if (s.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
-        var sensorColor = d3.scaleLinear().domain([1,5]).range(["yellow", "blue"])
+        var sensorColor = d3.scaleLinear()
+        .domain([1,8])
+        .range(["green", "red"])
+        .interpolate(d3.interpolateHcl)
         s.color = sensorColor
 
       } else if (s.type == historian.metrics.ERROR_TYPE) {
