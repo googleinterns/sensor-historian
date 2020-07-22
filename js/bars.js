@@ -778,6 +778,18 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             }
             return series.color(eventType);
         }
+        // Color for sensor historian is specifically chosen.
+        if (series.source == 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+            var scale = bar.clusteredCount;
+            if (bar.clusteredCount > 5){
+              // TODO: 5 is a temp limit.
+              scale = 5;
+            }
+            var baseColor = series.color(scale);
+            // TODO: Use Opacity of color to indicate sampling rate.
+            return baseColor
+          }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
           return series.color(bar.clusteredCount);
@@ -1285,23 +1297,24 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     'UID',
     'Package Name',
   ];
-  if (!values[0].value.includes("one-shot")){
+  if (!values[0].value.includes("ONE_SHOT")){
     headRow.push('Sampling Rate(Hz)');
-    headRow.push('Batching Rate(Hz)');
+    headRow.push('Batching Period(s)');
   }
   headRow.push('Source');
   headRow.push('Total Duration');
 
-  var highlightedBodyRows = []
+  var highlightActiveConn = [];
 
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
     var duration = historian.time.formatDuration(entry.duration);
     // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
-      highlightedBodyRows.push(index)
+      highlightActiveConn.push(index)
     }
-    var batching = v[7] == "-1.00"? "No batching" : v[7];
+
+    var batching = v[7] == "-1.00"? "Not batching" : v[7];
 
     return headRow.length > 6 ? 
     [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :

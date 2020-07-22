@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -499,8 +499,11 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
         if (!overlaps) {
           return;
         }
-        if (series.type == 'int' || series.type == 'float' ||
-            series.type == 'string' || series.type == 'bool') {
+        // For sensor activities, we do not reset the start/end time.
+        if ((series.source != 
+              historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) &&
+            (series.type == 'int' || series.type == 'float' ||
+             series.type == 'string' || series.type == 'bool')) {
           // These metrics represent state and should never overlap.
           // Sometimes the data gets mangled and they do, in which
           // case we need to fix it to ensure it displays at all.
