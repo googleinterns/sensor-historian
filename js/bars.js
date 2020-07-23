@@ -1335,15 +1335,7 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   var highlightActiveConn = [];
 
   var bodyRows = values.map(function(entry, index) {
-    // console.log(entry)
     var v = entry.value.split(',');
-
-    // var startTime = v[0];
-    // var endTime = v[1];
-    // var startTimeObj = new Date(startTime);
-    // var endTimeObj = new Date(endTime);
-    // console.log(startTimeObj);
-    // console.log(endTimeObj);
 
     var duration = historian.time.formatDuration(entry.duration);
     
