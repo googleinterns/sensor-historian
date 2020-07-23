@@ -70,9 +70,10 @@ var (
 	// sensorLineMMinusRE is a regular expression to match the sensor list line
 	// in the sensorservice dump of a bug report from MNC or before.
 	sensorLineMMinusRE = regexp.MustCompile(`(?P<sensorName>[^|]+)` + `\|` +
-		`(?P<sensorManufacturer>[^|]+)` + `\|` + `(\s*version=` +
-		`(?P<versionNumber>\d+)\s*\|)?` + `\s*(?P<sensorTypeString>[^|]+)` +
-		`\|` + `\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)\s*` + `\|` + `.*` + `\|` +
+		`(?P<sensorManufacturer>[^|]+)` + `\|` +
+		`(\s*version=` + `(?P<versionNumber>\d+)\s*\|)?` +
+		`\s*(?P<sensorTypeString>[^|]+)` + `\|` +
+		`\s*(?P<sensorNumber>0x[0-9A-Fa-f]+)\s*` + `\|` + `.*` + `\|` +
 		`\s*type=\d+\s*\|` + `\s*(?P<requestMode>[^|]+)` + `\s*\|` +
 		`(?P<variableOne>[^|]+)` + `\s*\|` + `(?P<variableTwo>[^|]+)` +
 		`\s*\|` + `(?P<batching>[^|]+)` + `\s*\|` + `(?P<wakeUp>[^|]+)`)
@@ -82,10 +83,10 @@ var (
 	// in the bugreport starting from NRD42 and onwards.
 	sensorLine1RE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` +
 		`\)\s*` + `(?P<sensorName>[^|]+)` + `\s*\|` +
-		`(?P<sensorManufacturer>[^|]+)` + `\|\s*ver:\s*` +
-		`(?P<versionNumber>\d+)` + `\s*\|\s*type:\s*` +
-		`(?P<sensorTypeString>[^(]+)` + `\(\d+\)\s*\|` + `\s*perm:\s*` +
-		`(?P<sensorPerm>[^|]+)`)
+		`(?P<sensorManufacturer>[^|]+)` +
+		`\|\s*ver:\s*` + `(?P<versionNumber>\d+)` +
+		`\s*\|\s*type:\s*` + `(?P<sensorTypeString>[^(]+)` + `\(\d+\)\s*\|` +
+		`\s*perm:\s*` + `(?P<sensorPerm>[^|]+)`)
 
 	// sensorLine2RE is a regular expression to match the second line of
 	// sensor information from the sensor list line in the sensorservice
@@ -562,9 +563,8 @@ func TimeStampToMs(timestamp, remainder string, loc *time.Location) (int64, erro
 // e.g. "123456" from "27.123456" corresponds to 123ms (and 27 seconds).
 func SecFractionAsMs(fr string) (int64, error) {
 	// The string will be parsed as ms, so only the leading 3 digits of the
-	// string are used.
-	// Make sure the remainder has at least 3 digits, so the slice operation
-	// doesn't fail.
+	// string are used. Make sure the remainder has at least 3 digits,
+	// so the slice operation doesn't fail.
 	fr = fmt.Sprintf("%s000", fr)
 	// Truncate to 3 decimal points.
 	ms := fr[:3]
