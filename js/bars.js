@@ -795,7 +795,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
               colorScale = '6-7';
             }
             var baseColor = series.color(colorScale);
-            return baseColor
+            return baseColor;
           }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
@@ -1333,7 +1333,7 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   headRow.push('Total Duration');
 
   var highlightActiveConn = [];
-
+  var onChange0SamplingPeriod = [];
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
 
@@ -1341,11 +1341,15 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     
     // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
-      highlightActiveConn.push(index)
+      highlightActiveConn.push(index);
     }
     // Batching Period = -1 is a default value set for active connections 
     // without a history.
     var batching = (v[7] == "-1.00") || (v[7] == "0.00")? "Not batching" : v[7];
+
+    if ((v[3].includes("ON_CHANGE")) && v[6] == "-1.00"){
+      onChange0SamplingPeriod.push(index);
+    }
 
     return headRow.length > 6 ? 
     [v[0], v[1], v[4], v[5], v[6], batching, v[8], duration] :
@@ -1357,8 +1361,14 @@ historian.Bars.prototype.createSensorTable_ = function(values){
       bodyRows[row][col] = {
         value: value,
         classes: 'highlighted-cell'
-      }
+      };
     });
+  });
+
+  onChange0SamplingPeriod.forEach(function(row){
+    bodyRows[row][4] = {
+      value: "on-change",
+    };
   });
 
   return {header: headRow, body: bodyRows};
