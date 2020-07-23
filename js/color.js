@@ -29,6 +29,11 @@ goog.require('historian.metrics.Csv');
 goog.require('historian.time');
 
 
+/** @private {function(string): string} */
+historian.color.sensorColorA = d3.scaleOrdinal()
+    .domain(['1', '2-3', '4-5', '6-7', '>=8'])
+    .range(['#6fac5d', '#697ed5', '#bc7d39', '#b94663', '#9350a1']);
+
 /**
  * Map from series name to color function.
  * @private {!Object<function(string): string>}
@@ -503,13 +508,8 @@ historian.color.generateSeriesColors = function(groups) {
   groups.getAll().forEach(function(group) {
     group.series.forEach(function(s) {
       // Handle sensor activities color.
-      // TODO: check the most suitable color scheme for accessibility.
       if (s.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
-        var sensorColor = d3.scaleLinear()
-        .domain([1,8])
-        .range(["green", "red"])
-        .interpolate(d3.interpolateHcl)
-        s.color = sensorColor
+        s.color = historian.color.sensorColorA;
 
       } else if (s.type == historian.metrics.ERROR_TYPE) {
         s.color = historian.color.error_;

@@ -407,6 +407,9 @@ historian.Bars.prototype.renderLabels_ = function() {
       '<b>' + group.name + '</b>',
       'From logs: ' + Object.keys(logSources).join(', ')
     ];
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+      lines.push("Client count:");
+    }
     var desc = historian.metrics.descriptors[group.name];
     if (desc) {
       // Text help descriptor.
@@ -781,13 +784,17 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         // Color for sensor historian is specifically chosen.
         if (series.source == 
           historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
-            var scale = bar.clusteredCount;
-            if (bar.clusteredCount > 8){
-              // TODO: 8 is a temp limit.
-              scale = 8;
+            var colorScale = '>=8';
+            if (bar.clusteredCount < 2){
+              colorScale = '1';
+            } else if (bar.clusteredCount < 4){
+              colorScale = '2-3';
+            } else if (bar.clusteredCount < 6){
+              colorScale = '4-5';
+            } else if (bar.clusteredCount < 8){
+              colorScale = '6-7';
             }
-            var baseColor = series.color(scale);
-            // TODO: Use Opacity of color to indicate sampling rate.
+            var baseColor = series.color(colorScale);
             return baseColor
           }
         // Use count to determine color for aggregated stats.
@@ -800,8 +807,29 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
+      var opacity = function(bar) {
+        if (series.source != 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+            return 1;
+        }
+        var curRate = bar.maxRate;
+        var sensor = historian.sensorsInfo.Sensors[bar.sensorNum];
+        var opacity = 0.4;
+        // For one-shot sensor, opacity is set to be 0.4.
+        if (sensor.RequestMode == 2){
+          return opacity;
+        }
+        if (curRate > 0.3 * sensor.MaxRateHz){
+          opacity = 0.7;
+        }else if (curRate > 0.6 * sensor.MaxRateHz){
+          opacity = 1;
+        }
+        return opacity
+      }
+
       merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
           .attr('stroke', color)
+          .style('opacity', opacity)
           .style('display', showBars ? 'inline' : 'none');
       bars.exit().remove();
     }.bind(this));
@@ -1307,8 +1335,18 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   var highlightActiveConn = [];
 
   var bodyRows = values.map(function(entry, index) {
+    // console.log(entry)
     var v = entry.value.split(',');
+
+    // var startTime = v[0];
+    // var endTime = v[1];
+    // var startTimeObj = new Date(startTime);
+    // var endTimeObj = new Date(endTime);
+    // console.log(startTimeObj);
+    // console.log(endTimeObj);
+
     var duration = historian.time.formatDuration(entry.duration);
+    
     // Highlight the row related to active connection.
     if (v[v.length - 1] == "isActiveConn"){
       highlightActiveConn.push(index)
