@@ -111,6 +111,7 @@ func MaxInt64(a int64, b int64) int64 {
 }
 
 // PeriodUsToRateHz takes in the period in us and returns the frequency in Hz.
+// The frequency returned is rounded to 2 decimal places.
 // Note that if period is 0 or -1, then the rate is set to be -1.
 func PeriodUsToRateHz(periodUs int) float64 {
 	if periodUs == 0 || periodUs == -1 {

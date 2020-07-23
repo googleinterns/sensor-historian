@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Protocol buffers for storing active connection information.
-syntax = "proto3";
+syntax = "proto2";
 
 package sensorsinfo;
 
@@ -21,29 +21,29 @@ option go_package = "github.com/googleinterns/sensor-historian/pb/sensorsinfo_pr
 
 // ActiveConn contains information about an active connection.
 message ActiveConn{
-    int32 Number = 1;
-    string OperatingMode = 2;
-    string PackageName = 3;
-    int32 UID = 4;
-    int32 SensorNumber = 5;
-    int32 PendingFlush = 6;
-    double SamplingRateHz = 7;
-    double BatchingPeriodS = 8;
-    bool HasSensorserviceRecord = 9;
-    string Source = 10;
+    required string PackageName = 1;
+    required int32 UID = 2;
+    required int32 SensorNumber = 3;
+    optional int32 Number = 4;
+    optional int32 PendingFlush = 5;
+    optional double SamplingRateHz = 6;
+    optional double BatchingPeriodS = 7;
+    optional bool HasSensorserviceRecord = 8;
+    optional string OperatingMode = 9;
+    optional string Source = 10;
 }
 
 // SubscriptionInfo contains information about one subscription event of
 // a sensor to an application.
 message SubscriptionInfo{
-    int64 StartMs = 1;
-    int64 EndMs = 2;
-    int32 SensorNumber = 3;
-    int32 UID = 4;
-    string PackageName = 5;
-    double SamplingRateHz = 6;
-    double BatchingPeriodS = 7;
-    string Source = 8;
+    required int64 StartMs = 1;
+    required int64 EndMs = 2;
+    required int32 SensorNumber = 3;
+    required int32 UID = 4;
+    required string PackageName = 5;
+    optional double SamplingRateHz = 6;
+    optional double BatchingPeriodS = 7;
+    optional string Source = 8;
 }
 
 enum RequestMode{
@@ -54,24 +54,24 @@ enum RequestMode{
 }
 
 message Sensor{
-    string Name = 1;
-    string Type = 2;
-    int32 Version = 3;
-    int32 Number = 4;
-    RequestMode RequestMode = 5;
-    double MaxRateHz = 6;
-    double MinRateHz = 7;
-    bool Batch = 8;
-    int32 Max = 9;
-    int32 Reserved = 10;
-    bool WakeUp = 11;
+    required int32 Number = 1;
+    required string Name = 2;
+    required string Type = 3;
+    required RequestMode RequestMode = 4;
+    required double MaxRateHz = 5;
+    required double MinRateHz = 6;
+    optional int32 Version = 7;
+    optional int32 Max = 8;
+    optional int32 Reserved = 9;
+    optional bool Batch = 10;
+    optional bool WakeUp = 11;
     repeated SubscriptionInfo Subscriptions = 12;
     repeated ActiveConn ActiveConns = 13;
 }
 
 message App{
-    int32 UID = 1;
-    string PackageName = 2;
+    required int32 UID = 1;
+    optional string PackageName = 2;
     repeated SubscriptionInfo Subscriptions = 3;
     repeated ActiveConn ActiveConns = 4;
 }
