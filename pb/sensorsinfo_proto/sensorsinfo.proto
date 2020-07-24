@@ -1,0 +1,83 @@
+// Copyright 2020 Google LLC. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Protocol buffers for storing active connection information.
+syntax = "proto3";
+
+package sensorsinfo;
+
+option go_package = "github.com/googleinterns/sensor-historian/pb/sensorsinfo_proto;sensorsinfo";
+
+// ActiveConn contains information about an active connection.
+message ActiveConn{
+    string PackageName = 1;
+    int32 UID = 2;
+    int32 SensorNumber = 3;
+    int32 Number = 4;
+    int32 PendingFlush = 5;
+    double SamplingRateHz = 6;
+    double BatchingPeriodS = 7;
+    bool HasSensorserviceRecord = 8;
+    string OperatingMode = 9;
+    string Source = 10;
+}
+
+// SubscriptionInfo contains information about one subscription event of
+// a sensor to an application.
+message SubscriptionInfo{
+    int64 StartMs = 1;
+    int64 EndMs = 2;
+    int32 SensorNumber = 3;
+    int32 UID = 4;
+    string PackageName = 5;
+    double SamplingRateHz = 6;
+    double BatchingPeriodS = 7;
+    string Source = 8;
+}
+
+enum RequestMode{
+    CONTINUOUS = 0;
+    ON_CHANGE = 1;
+    ONE_SHOT = 2;
+    SPECIAL = 3;
+}
+
+message Sensor{
+    int32 Number = 1;
+    string Name = 2;
+    string Type = 3;
+    RequestMode RequestMode = 4;
+    double MaxRateHz = 5;
+    double MinRateHz = 6;
+    int32 Version = 7;
+    int32 Max = 8;
+    int32 Reserved = 9;
+    bool Batch = 10;
+    bool WakeUp = 11;
+    repeated SubscriptionInfo Subscriptions = 12;
+    repeated ActiveConn ActiveConns = 13;
+}
+
+message App{
+    int32 UID = 1;
+    string PackageName = 2;
+    repeated SubscriptionInfo Subscriptions = 3;
+    repeated ActiveConn ActiveConns = 4;
+}
+
+message AllSensorsInfo{
+    repeated ActiveConn AllActiveConns = 1;
+    repeated Sensor Sensors = 2;
+    repeated App Apps = 3;
+}
