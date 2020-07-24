@@ -19,17 +19,42 @@ package sensorsinfo;
 
 option go_package = "github.com/googleinterns/sensor-historian/pb/sensorsinfo_proto;sensorsinfo";
 
+enum RateLevel{
+    STOP = 0;
+    NORMAL = 1;
+    FAST = 2;
+    VERY_FAST = 3;
+}
+
+message DirectConnSensor{
+    int32 Number = 1;
+    RateLevel Rate = 2;
+}
+
+// DirectConn contains information about a direct connection.
+message DirectConn{
+    int32 Number = 1;
+    string PackageName = 2;
+    int32 HALChannelHandle = 3;
+    repeated DirectConnSensor ActivatedSensors = 4;
+    string Source = 5;
+}
+
+message ActiveConnSensor{
+    int32 Number = 1;
+    string Name = 2;
+    double SamplingRateHz = 3;
+    double BatchingPeriodS = 4;
+    bool HasSensorserviceRecord = 5;
+    string Source = 6;
+}
+
 // ActiveConn contains information about an active connection.
 message ActiveConn{
     int32 Number = 1;
     string OperatingMode = 2;
     string PackageName = 3;
     int32 UID = 4;
-    int32 SensorNumber = 5;
-    int32 PendingFlush = 6;
-    double SamplingRateHz = 7;
-    double BatchingPeriodS = 8;
-    bool HasSensorserviceRecord = 9;
     string Source = 10;
 }
 

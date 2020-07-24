@@ -20,7 +20,6 @@
 cd $GOPATH/src/
 
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/sensorsinfo_proto/*.proto
-protoc --go_out=. github.com/googleinterns/sensor-historian/pb/activeconnection_proto/*.proto
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/build_proto/*.proto
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/batterystats_proto/*.proto
 protoc --go_out=. github.com/googleinterns/sensor-historian/pb/metrics_proto/*.proto
