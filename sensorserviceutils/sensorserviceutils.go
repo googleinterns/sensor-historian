@@ -382,6 +382,11 @@ func (slice sensors) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
+// allSensorInfo is a function to create the output data after parsing the
+// sensorservice dump section. The output contains information for all active
+// connections, all sensors' activities grouped by sensors, and all sensors'
+// activities grouped by applications.
+// TODO: organized the sensors' activities data by applications.s
 func (p parser) allSensorInfo() *sipb.AllSensorsInfo {
 	allActiveConns := make(activeConns, 0, len(p.activeConns))
 	for _, conn := range p.activeConns {
@@ -564,20 +569,201 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 	return p.parsingErrs, p.sensorErrs
 }
 
+// createTimestampMs is a helper function that parses the time information for
+// one line and generates the timestamp in ms. It also accomodate the case
+// where the time information includes date.
+func (p *parser) createTimestampMs(line string, result map[string]string) int64 {
+	hasDate, date := historianutils.SubexpNames(timeLayoutRE, line)
+	var timestampMs int64
+	var timestampErr error
+	if hasDate {
+		month, err := strconv.Atoi(date["month"])
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("%s: error parsing month value for line %v: %v",
+					parseRegErrStr, line, timestampErr))
+			return -1
+		}
+		day, err := strconv.Atoi(date["day"])
+		if err != nil {
+			p.parsingErrs = append(p.parsingErrs,
+				fmt.Errorf("%s: error parsing day value for line %v: %v",
+					parseRegErrStr, line, timestampErr))
+			return -1
+		}
+		timestampMs, timestampErr = p.fullTimestampInMs(month, day,
+			result["time"])
+	} else {
+		timestampMs, timestampErr = p.fullTimestampInMs(p.referenceMonth,
+			p.referenceDay, result["time"])
+	}
+	if timestampErr != nil {
+		p.parsingErrs = append(p.parsingErrs,
+			fmt.Errorf("%s: error parsing time information for line %v: %v",
+				parseRegErrStr, line, timestampErr))
+		return -1
+	}
+	if p.earliestTimestampMs > timestampMs {
+		p.earliestTimestampMs = timestampMs
+	}
+	return timestampMs
+}
+
+// checkSamplingBatchingData is a helper function that checks whether the
+// sampling rate and batching period values obtained from the history section
+// match the values obtained from the active connection section.
+// [Active Sensor] errors will be reported if there is a mis-match.
+func (p *parser) checkSamplingBatchingData(packageName string,
+	sensorNumber int32, samplingRateHz, batchingPeriodS float64) {
+	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+	conn := p.activeConns[identifier]
+	if samplingRateHz != conn.SamplingRateHz {
+		p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+			"[Active Sensor]: active connection for pkg(%s) and sensor(%d) "+
+				"shows two sampling rate(Hz): %.2f at active sensor section; "+
+				"%.2f at history section", packageName, sensorNumber,
+			conn.SamplingRateHz, samplingRateHz))
+		if conn.SamplingRateHz == -1 {
+			p.activeConns[identifier].SamplingRateHz = samplingRateHz
+		}
+	}
+	if batchingPeriodS != conn.BatchingPeriodS {
+		p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+			"[Active Sensor]: active connection for pkg(%s) and sensor(%d) "+
+				"shows two batching period(s): %.2f at active sensor section; "+
+				"%.2f at history section", packageName, sensorNumber,
+			conn.BatchingPeriodS, batchingPeriodS))
+		if conn.BatchingPeriodS == -1 {
+			p.activeConns[identifier].BatchingPeriodS = batchingPeriodS
+		}
+	}
+}
+
+// processActivation is a helper function that process the activation
+// statement in the sensorservice dump.
+func (p *parser) processActivation(timestampMs int64, sensorNumber int32,
+	uid int, packageName, l string) {
+	_, result := historianutils.SubexpNames(addRegistrationRE, l)
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+	sensorName := p.sensors[sensorNumber].Name
+
+	samplingPeriodUs, err := strconv.Atoi(result["samplingPeriodUs"])
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: error parsing samplingPeriod %v us for line %v: %v",
+			parseRegErrStr, result["samplingPeriodUs"], l, err))
+		return
+	}
+	batchingPeriodUs, err := strconv.Atoi(result["batchingPeriodUs"])
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: error parsing batchingPeriod %v us for line %v: %v",
+			parseRegErrStr, result["batchingPeriodUs"], l, err))
+		return
+	}
+	samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
+	batchingPeriodS := math.Round(float64(batchingPeriodUs)*1e-04) / 100
+
+	start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
+	if _, exist := p.history[identifier]; !exist {
+		// If there is no history of de-activating a subscription,
+		// the subscription has to be active.
+		if conn, isActive := p.activeConns[identifier]; isActive {
+			p.checkSamplingBatchingData(packageName, sensorNumber,
+				samplingRateHz, batchingPeriodS)
+			// For active connection, set current time as the end time
+			// for the ongoing subscription event.
+			end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
+			value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start,
+				end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+				uid, packageName, samplingRateHz, batchingPeriodS,
+				sensorDump, "isActiveConn")
+			p.csvState.Print(sensorName, "string", timestampMs,
+				referenceTimestampMs, value, "")
+
+			conn.HasSensorserviceRecord = true
+			p.activeConns[identifier] = conn
+		} else {
+			p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+				"[Invalid Activation]: connection between pkg(%s) "+
+					"and sensor(%d) should be active",
+				packageName, sensorNumber))
+		}
+	} else {
+		// A de-activation statement for the subscription event is seen.
+		eventInfo := p.history[identifier]
+		if eventInfo.StartMs != -1 {
+			// A previous de-activation statement for this connection
+			// has paired up with an activation statement. The current
+			// activation statement is an extra one.
+			p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+				"[Multiple Activation]: for pkg(%s) and sensor(%d)",
+				packageName, sensorNumber))
+		} else {
+			// The current activation statement can pair up with a
+			// previous de-activation statement to complete a
+			// subscription event.
+			eventInfo.StartMs = timestampMs
+			eventInfo.SamplingRateHz = samplingRateHz
+			eventInfo.BatchingPeriodS = batchingPeriodS
+			end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
+			value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
+				end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+				uid, packageName, samplingRateHz, batchingPeriodS, sensorDump)
+			p.csvState.Print(sensorName, "string", timestampMs, eventInfo.EndMs,
+				value, "")
+		}
+	}
+}
+
+// processDeActivation is a helper function that processes the deactivation
+// statement in the sensorservice dump.
+func (p *parser) processDeActivation(timestampMs int64, sensorNumber int32,
+	packageName string) {
+	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+	if event, exist := p.history[identifier]; exist {
+		// The current subscription combo has been seen.
+		if event.StartMs == -1 {
+			p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+				"[Multiple De-Activation]: for pkg(%s) and sensor(%d)",
+				packageName, sensorNumber))
+		} else {
+			// Current de-activation statement will be counted as a new event.
+			eventInfo := &sipb.SubscriptionInfo{
+				StartMs:      -1,
+				EndMs:        timestampMs,
+				SensorNumber: sensorNumber,
+				PackageName:  packageName,
+				Source:       sensorDump,
+			}
+			p.history[identifier] = eventInfo
+		}
+	} else {
+		eventInfo := &sipb.SubscriptionInfo{
+			StartMs:      -1,
+			EndMs:        timestampMs,
+			SensorNumber: sensorNumber,
+			PackageName:  packageName,
+			Source:       sensorDump,
+		}
+		p.history[identifier] = eventInfo
+	}
+}
+
 // extractRegistrationHistory extracts all previous registration information
 // found in the sensorservice dump of a bug report.
 // Note that the previous registration history records the subscription event
 // in reverse chronological order.
 func (p *parser) extractRegistrationHistory() ([]error, []error) {
-	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
-		p.referenceDay, p.referenceTime)
 	for p.valid() {
 		l := p.line()
 		var result map[string]string
 		isAdd := false
 		if m, match := historianutils.SubexpNames(addRegistrationRE, l); m {
-			result = match
 			isAdd = true
+			result = match
 		} else if m, match := historianutils.SubexpNames(removeRegistrationRE, l); m {
 			result = match
 		} else {
@@ -585,40 +771,10 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 			break
 		}
 
-		// Get the time of the record.
-		// Accomodate the case where the time information includes date.
-		hasDate, date := historianutils.SubexpNames(timeLayoutRE, l)
-		var timestampMs int64
-		var timestampErr error
-		if hasDate {
-			month, err := strconv.Atoi(date["month"])
-			if err != nil {
-				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("%s: error parsing month information for "+
-						"line %v: %v", parseRegErrStr, l, timestampErr))
-				continue
-			}
-			day, err := strconv.Atoi(date["day"])
-			if err != nil {
-				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("%s: error parsing day information for "+
-						"line %v: %v", parseRegErrStr, l, timestampErr))
-				continue
-			}
-			timestampMs, timestampErr = p.fullTimestampInMs(month, day,
-				result["time"])
-		} else {
-			timestampMs, timestampErr = p.fullTimestampInMs(p.referenceMonth,
-				p.referenceDay, result["time"])
-		}
-		if timestampErr != nil {
-			p.parsingErrs = append(p.parsingErrs,
-				fmt.Errorf("%s: error parsing time information for line %v: %v",
-					parseRegErrStr, l, timestampErr))
+		// Get the timestamp of the record.
+		timestampMs := p.createTimestampMs(l, result)
+		if timestampMs == -1 {
 			continue
-		}
-		if p.earliestTimestampMs > timestampMs {
-			p.earliestTimestampMs = timestampMs
 		}
 
 		// All registration history records information for
@@ -646,133 +802,11 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 					parseRegErrStr, result["uid"], l, err))
 			continue
 		}
-		identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
 
 		if isAdd {
-			// Currently processing an activated statement.
-			samplingPeriodUs, err := strconv.Atoi(result["samplingPeriodUs"])
-			if err != nil {
-				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-					"%s: error parsing samplingPeriod %v us for line %v: %v",
-					parseRegErrStr, result["samplingPeriodUs"], l, err))
-				continue
-			}
-			batchingPeriodUs, err := strconv.Atoi(result["batchingPeriodUs"])
-			if err != nil {
-				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-					"%s: error parsing batchingPeriod %v us for line %v: %v",
-					parseRegErrStr, result["batchingPeriodUs"], l, err))
-				continue
-			}
-			samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
-			batchingPeriodS := math.Round(float64(batchingPeriodUs)*1e-04) / 100
-			_, exist := p.history[identifier]
-			if !exist {
-				// If there is no history of de-activating a subscription,
-				// the subscription has to be active.
-				if conn, isActive := p.activeConns[identifier]; isActive {
-					// For active connection, set current time as the end time
-					// for the ongoing subscription event.
-					sensorName := p.sensors[sensorNumber].Name
-					if samplingRateHz != conn.SamplingRateHz {
-						p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-							"[Active Sensor]: active connection for pkg(%s) "+
-								"and sensor(%d) shows two sampling rate(Hz):"+
-								" %.2f at active sensor section; %.2f at "+
-								"history section", packageName, sensorNumber,
-							conn.SamplingRateHz, samplingRateHz))
-						if conn.SamplingRateHz == -1 {
-							p.activeConns[identifier].SamplingRateHz =
-								samplingRateHz
-						}
-					}
-					if batchingPeriodS != conn.BatchingPeriodS {
-						p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-							"[Active Sensor]: active connection for pkg(%s) "+
-								"and sensor(%d) shows two batching period(s):"+
-								" %.2f at active sensor section; %.2f at "+
-								"history section", packageName, sensorNumber,
-							conn.BatchingPeriodS, batchingPeriodS))
-						if conn.BatchingPeriodS == -1 {
-							p.activeConns[identifier].BatchingPeriodS =
-								batchingPeriodS
-						}
-					}
-
-					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
-					end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start,
-						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
-						uid, packageName, samplingRateHz, batchingPeriodS,
-						sensorDump, "isActiveConn")
-
-					p.csvState.Print(sensorName, "string", timestampMs,
-						referenceTimestampMs, value, "")
-					conn.HasSensorserviceRecord = true
-					p.activeConns[identifier] = conn
-				} else {
-					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-						"[Invalid Activation]: connection between pkg(%s) "+
-							"and sensor(%d) should be active", packageName,
-						sensorNumber))
-				}
-			} else {
-				// A de-activation statement for the subscription event is seen.
-				eventInfo := p.history[identifier]
-				if eventInfo.StartMs != -1 {
-					// A previous de-activation statement for this connection
-					// has paired up with an activation statement. The current
-					// activation statement is an extra one.
-					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-						"[Multiple Activation]: for pkg(%s) and sensor(%d)",
-						packageName, sensorNumber))
-				} else {
-					// The current activation statement can pair up with a
-					// previous de-activation statement to complete a
-					// subscription event.
-					eventInfo.StartMs = timestampMs
-					eventInfo.SamplingRateHz = samplingRateHz
-					eventInfo.BatchingPeriodS = batchingPeriodS
-					sensorName := p.sensors[sensorNumber].Name
-					start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
-					end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
-					value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
-						end, sensorNumber, p.sensors[sensorNumber].RequestMode,
-						uid, packageName, samplingRateHz, batchingPeriodS,
-						sensorDump)
-					p.csvState.Print(sensorName, "string",
-						timestampMs, eventInfo.EndMs, value, "")
-				}
-			}
+			p.processActivation(timestampMs, sensorNumber, uid, packageName, l)
 		} else {
-			// Currently processing a de-activation statement.
-			if event, exist := p.history[identifier]; exist {
-				if event.StartMs == -1 {
-					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-						"[Multiple De-Activation]: for pkg(%s) and sensor(%d)",
-						packageName, sensorNumber))
-				} else {
-					// Current de-activation statement will be counted as
-					// a new subscription event.
-					eventInfo := &sipb.SubscriptionInfo{
-						StartMs:      -1,
-						EndMs:        timestampMs,
-						SensorNumber: sensorNumber,
-						PackageName:  packageName,
-						Source:       sensorDump,
-					}
-					p.history[identifier] = eventInfo
-				}
-			} else {
-				eventInfo := &sipb.SubscriptionInfo{
-					StartMs:      -1,
-					EndMs:        timestampMs,
-					SensorNumber: sensorNumber,
-					PackageName:  packageName,
-					Source:       sensorDump,
-				}
-				p.history[identifier] = eventInfo
-			}
+			p.processDeActivation(timestampMs, sensorNumber, packageName)
 		}
 	}
 
