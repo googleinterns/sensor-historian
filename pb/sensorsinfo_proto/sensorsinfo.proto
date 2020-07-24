@@ -55,7 +55,8 @@ message ActiveConn{
     string OperatingMode = 2;
     string PackageName = 3;
     int32 UID = 4;
-    string Source = 10;
+    repeated ActiveConnSensor ActiveSensors = 5;
+    string Source = 6;
 }
 
 // SubscriptionInfo contains information about one subscription event of
