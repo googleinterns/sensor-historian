@@ -45,8 +45,9 @@ message ActiveConnSensor{
     string Name = 2;
     double SamplingRateHz = 3;
     double BatchingPeriodS = 4;
-    bool HasSensorserviceRecord = 5;
-    string Source = 6;
+    int32 PendingFlush = 5;
+    bool HasSensorserviceRecord = 6;
+    string Source = 7;
 }
 
 // ActiveConn contains information about an active connection.
