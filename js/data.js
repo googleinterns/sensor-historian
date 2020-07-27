@@ -1516,9 +1516,9 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
     if ((typeof entry.value) == "string" && 
       (entry.value.includes("Sensorservice Dump"))){
       var v = entry.value.split(',');
-      var curRate = parseFloat(v[6]);
+      var curRate = parseFloat(v[8]);
       maxRate = (curRate > maxRate) ? curRate: maxRate;
-      sensorNum = parseInt(v[2]);
+      sensorNum = parseInt(v[4]);
     }
 
     // Id can be zero, so don't use falsy check.

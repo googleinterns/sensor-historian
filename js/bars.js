@@ -813,7 +813,18 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             return 1;
         }
         var curRate = bar.maxRate;
-        var sensor = historian.sensorsInfo.Sensors[bar.sensorNum];
+        var sensor;
+        historian.sensorsInfo.Sensors.forEach(function (sensorObj){
+          // Accomodate the case where sensor number is 0, the protobuf
+          // message does not have the field for Number
+          if (bar.sensorNum == 0) {
+            if (!sensorObj.Number) {
+              sensor = sensorObj;
+            }
+          }else if (sensorObj.Number == bar.sensorNum) {
+            sensor = sensorObj;
+          }
+        });
         var opacity = 0.4;
         // For one-shot sensor, opacity is set to be 0.4.
         if (sensor.RequestMode == 2){
@@ -1336,24 +1347,25 @@ historian.Bars.prototype.createSensorTable_ = function(values){
   var onChange0SamplingPeriod = [];
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
+    var startMs = parseInt(v[1],10);
+    var endMs = parseInt(v[3],10);
+    var durationOutput = historian.time.formatDuration(endMs - startMs);
 
-    var duration = historian.time.formatDuration(entry.duration);
-    
     // Highlight the row related to active connection.
-    if (v[v.length - 1] == "isActiveConn"){
+    if (v[v.length - 1] == "isActiveConn") {
       highlightActiveConn.push(index);
     }
     // Batching Period = -1 is a default value set for active connections 
     // without a history.
     var batching = (v[9] == "-1.00") || (v[9] == "0.00")? "Not batching" : v[9];
 
-    if ((v[5].includes("ON_CHANGE")) && v[8] == "-1.00"){
+    if ((v[5].includes("ON_CHANGE")) && v[8] == "-1.00") {
       onChange0SamplingPeriod.push(index);
     }
 
     return headRow.length > 6 ? 
-    [v[0], v[2], v[6], v[7], v[8], batching, v[10], duration] :
-    [v[0], v[2], v[6], v[7], v[10], duration];
+    [v[0], v[2], v[6], v[7], v[8], batching, v[10], durationOutput] :
+    [v[0], v[2], v[6], v[7], v[10], durationOutput];
   });
 
   highlightActiveConn.forEach(function(row){
