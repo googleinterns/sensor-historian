@@ -34,19 +34,29 @@ import (
 )
 
 var (
-	// Each of the connLineXRE is a regular expression to match the X line of
-	// connection information in the sensorservice dump in the bugreport.
+	// Each of the actConnLineXRE is a regular expression to match the X line of
+	// active connection information in the sensorservice dump in the bugreport.
 	// Active connection information has the same format for all Android versions.
-	connLine1RE = regexp.MustCompile(`\s*Connection\s+Number:\s*` +
+	actConnLine1RE = regexp.MustCompile(`\s*Connection\s+Number:\s*` +
 		`(?P<connNum>\d+)`)
-	connLine2RE = regexp.MustCompile(`\s*Operating\s+Mode:` +
+	actConnLine2RE = regexp.MustCompile(`\s*Operating\s+Mode:` +
 		`(?P<connMode>[^(]+)` + `\s*`)
-	connLine3RE = regexp.MustCompile(`\s*(?P<packageName>[^(]+)` +
+	actConnLine3RE = regexp.MustCompile(`\s*(?P<packageName>[^(]+)` +
 		`\s*\|\s*` + `WakeLockRefCount\s*(?P<wakeLockRefCount>\d+)` +
 		`\s*\|\s*` + `uid\s*(?P<uid>\d+)`)
-	connLine4RE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` +
+	actConnLine4RE = regexp.MustCompile(`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` +
 		`\s*\|\s*` + `status:\s*(?P<status>[^(]+)` + `\s*\|\s*` +
 		`pending\s*flush\s*events\s*` + `(?P<pendingFlush>\d+)`)
+
+	// Each of the dirConnLineXRE is a regular expression to match the X line of
+	// direct connection information in the sensorservice dump in the bugreport.
+	dirConnLine1RE = regexp.MustCompile(`\s*Direct\s+connection\s*` +
+		`(?P<connNum>\d+)`)
+	dirConnLine2RE = regexp.MustCompile(`Package\s*(?P<packageName>[^(^,]+),` +
+		`\s*HAL\s*channel\s*handle (?P<halHandle>\d+)`)
+	dirConnLine3RE = regexp.MustCompile(`\s*Sensor\s*` +
+		`(?P<sensorNumber>0x?[0-9A-Fa-f]+)` + `\,\s*rate\s*` +
+		`(?P<rateLevel>\d+)`)
 
 	// sensorListRE is a regular expression to match the section for all
 	// sensors' information in the sensorservice dump in the bugreport
@@ -177,6 +187,10 @@ type parser struct {
 	// an identifier formed by concatenating sensor number and package name.
 	activeConns map[string]*sipb.ActiveConn
 
+	// directConns is a map from an identifier to the relevant connection
+	// information.
+	directConns map[string]*sipb.DirectConn
+
 	// history is a map from an identifier to an sensor subscription event.
 	// Note that the identifier is a string formed by concatenating
 	// sensor number and name of the package that subscribes the sensor.
@@ -226,6 +240,11 @@ func (p *parser) valid() bool {
 // will be collected into an errors slice.
 // The parser will continue parsing remaining events.
 func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
+	// Sensor historian only supports andriod sdk version 26 and onwards.
+	if meta.SdkVersion < 26 {
+		return OutputData{"", nil, nil, nil}
+	}
+
 	loc, err := bugreportutils.TimeZone(f)
 	if err != nil {
 		parseErr := []error{fmt.Errorf(
@@ -254,6 +273,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		lines:          strings.Split(f, "\n"),
 		activeSensors:  make(map[int32]activeSensor),
 		activeConns:    make(map[string]*sipb.ActiveConn),
+		directConns:    make(map[string]*sipb.DirectConn),
 		history:        make(map[string]*sipb.SubscriptionInfo),
 		sensors:        make(map[int32]*sipb.Sensor),
 	}
@@ -274,6 +294,11 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 			p.parsingErrs, p.sensorErrs = p.extractActiveConnInfo()
 			continue
 		}
+		// Parse direct connection information.
+		if m, _ := historianutils.SubexpNames(directConnRE, l); m {
+			p.parsingErrs, p.sensorErrs = p.extractDirectConnInfo()
+			continue
+		}
 		// Parse registration history information
 		if m, _ := historianutils.SubexpNames(prevRegistrationRE, l); m {
 			p.parsingErrs, p.sensorErrs = p.extractRegistrationHistory()
@@ -286,6 +311,9 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		p.parsingErrs, p.sensorErrs}
 }
 
+// constructSensorName takes in the name, type, and number of a sensor and
+// reconstruct a sensor name if necessary. This function is called only when
+// we see multiple sensors sharing the same name.
 func constructSensorName(nameStr, typeStr string, number int32) string {
 	var newName string
 	typeMap := strings.Split(typeStr, ".")
@@ -300,7 +328,10 @@ func constructSensorName(nameStr, typeStr string, number int32) string {
 	return newName
 }
 
-func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
+// updateSensorsInfo is a helper function that takes in a map containing sensor
+// information stored in bugreportutils.SensorInfo and output a new map storing
+// sensor information in *sipb.Sensor.
+func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) map[int32]*sipb.Sensor {
 	sensorCheck := make(map[string][]int32, len(sensors))
 	for curNum, sensorInfo := range sensors {
 		curSensorName := sensorInfo.Name
@@ -367,6 +398,7 @@ func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) {
 		}
 		p.sensors[curNum] = sensor
 	}
+	return p.sensors
 }
 
 // To sort sensor information by sensor number, the following interface is used.
@@ -382,6 +414,21 @@ func (slice sensors) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
+// To sort the direct connection information, the following interface is used.
+type directConns []*sipb.DirectConn
+
+func (slice directConns) Len() int {
+	return len(slice)
+}
+
+func (slice directConns) Less(i, j int) bool {
+	return slice[i].Number < slice[j].Number
+}
+
+func (slice directConns) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 // allSensorInfo is a function to create the output data after parsing the
 // sensorservice dump section. The output contains information for all active
 // connections, all sensors' activities grouped by sensors, and all sensors'
@@ -394,6 +441,12 @@ func (p parser) allSensorInfo() *sipb.AllSensorsInfo {
 	}
 	sort.Sort(allActiveConns)
 
+	allDirectConns := make(directConns, 0, len(p.directConns))
+	for _, conn := range p.directConns {
+		allDirectConns = append(allDirectConns, conn)
+	}
+	sort.Sort(allDirectConns)
+
 	allSensors := make(sensors, 0, len(p.sensors))
 	for _, sensorInfo := range p.sensors {
 		allSensors = append(allSensors, sensorInfo)
@@ -402,12 +455,13 @@ func (p parser) allSensorInfo() *sipb.AllSensorsInfo {
 
 	return &sipb.AllSensorsInfo{
 		AllActiveConns: allActiveConns,
+		AllDirectConns: allDirectConns,
 		Sensors:        allSensors,
 		Apps:           nil,
 	}
 }
 
-// extractActiveConnInfo extracts information for active sensors found in
+// extractActiveSensorInfo extracts information for active sensors found in
 // the sensorservice dump of a bugreport.
 func (p parser) extractActiveSensorInfo() ([]error, []error) {
 	for p.valid() {
@@ -454,10 +508,65 @@ func (p parser) extractActiveSensorInfo() ([]error, []error) {
 	return p.parsingErrs, p.sensorErrs
 }
 
+// organizeSensorInfoForActiveConn is a helper function that specifically
+// handle the sensors' information parsed for each active connection.
+// A special case it handles is when there are multiple sensors being activated
+// by one active connection, then multiple active connection objects will be
+// created.
+func (p parser) organizeSensorInfoForActiveConn(connNum int32,
+	result map[string]string, connections map[int32]*sipb.ActiveConn) (int32,
+	map[int32]*sipb.ActiveConn, []error, []error) {
+	n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: connection(%d): error parsing sensorNumber %v:%v",
+			parseConnErrStr, connNum, result["sensorNumber"], err))
+		return connNum, nil, p.parsingErrs, p.sensorErrs
+	}
+	sensorNumber := int32(n)
+	pendingFlush, err := strconv.Atoi(result["pendingFlush"])
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: connection(%d): error parsing pendingFlush %v:%v",
+			parseConnErrStr, connNum, result["pendingFlush"], err))
+		return connNum, nil, p.parsingErrs, p.sensorErrs
+	}
+
+	if connections[connNum].SensorNumber != -1 {
+		newConnNum := connNum + 1
+		newConn := &sipb.ActiveConn{
+			Number:                 newConnNum,
+			OperatingMode:          connections[connNum].OperatingMode,
+			PackageName:            connections[connNum].PackageName,
+			UID:                    connections[connNum].UID,
+			SensorNumber:           -1,
+			PendingFlush:           -1,
+			SamplingRateHz:         -1,
+			BatchingPeriodS:        -1,
+			HasSensorserviceRecord: false,
+			Source:                 sensorDump,
+		}
+		connections[newConnNum] = newConn
+		connNum = newConnNum
+	}
+	connections[connNum].SensorNumber = sensorNumber
+	connections[connNum].PendingFlush = int32(pendingFlush)
+	if activeSensor, exist := p.activeSensors[sensorNumber]; exist {
+		connections[connNum].SamplingRateHz = activeSensor.samplingRateHz
+		connections[connNum].BatchingPeriodS = activeSensor.batchingPeriodS
+	} else {
+		p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
+			"[Active Connection]: connection(%d): the sensor(%d)"+
+				" is not active according to the sensor device section",
+			connNum, sensorNumber))
+	}
+	return connNum, connections, p.parsingErrs, p.sensorErrs
+}
+
 // extractActiveConnInfo extracts active connections information found in
 // the sensorservice dump of a bugreport.
 func (p parser) extractActiveConnInfo() ([]error, []error) {
-	curConnNum := int32(-1)
+	curConnNum := int32(0)
 	// connections is a map from active connection number to
 	// information for the relevant connection.
 	connections := make(map[int32]*sipb.ActiveConn)
@@ -478,18 +587,11 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 		}
 		// For all Android version: each active connection's information needs
 		// four lines to record.
-		if l1, result := historianutils.SubexpNames(connLine1RE, line); l1 {
-			connNum, err := strconv.Atoi(result["connNum"])
-			if err != nil {
-				p.parsingErrs = append(p.parsingErrs,
-					fmt.Errorf("%s: error parsing connection number %v:%v",
-						parseConnErrStr, result["connNum"], err))
-				continue
-			}
+		if l1, _ := historianutils.SubexpNames(actConnLine1RE, line); l1 {
 			// Since proto buff restricts that field numbers must be positive
 			// integers, we will not use zero-indexing by adding 1 to
 			// all connection number.
-			curConnNum = int32(connNum) + 1
+			curConnNum++
 			if _, ok := connections[curConnNum]; !ok {
 				connections[curConnNum] = &sipb.ActiveConn{
 					Number:                 curConnNum,
@@ -504,59 +606,116 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 					Source:                 sensorDump,
 				}
 			}
-		} else {
-			_, ok := connections[curConnNum]
-			if !ok {
+		} else if l2, result := historianutils.SubexpNames(actConnLine2RE, line); l2 {
+			connections[curConnNum].OperatingMode = result["connMode"]
+		} else if l3, result := historianutils.SubexpNames(actConnLine3RE, line); l3 {
+			uid, err := strconv.Atoi(result["uid"])
+			if err != nil {
 				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-					"%s: connection(%d): no information for this connection",
-					parseConnErrStr, curConnNum))
+					"%s: connection(%d): error parsing uid %v:%v",
+					parseConnErrStr, curConnNum, result["uid"], err))
 				continue
 			}
-			if l2, result := historianutils.SubexpNames(connLine2RE, line); l2 {
-				connections[curConnNum].OperatingMode = result["connMode"]
-			} else if l3, result := historianutils.SubexpNames(connLine3RE, line); l3 {
-				uid, err := strconv.Atoi(result["uid"])
-				if err != nil {
-					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-						"%s: connection(%d): error parsing uid %v:%v",
-						parseConnErrStr, curConnNum, result["uid"], err))
-					continue
-				}
-				connections[curConnNum].UID = int32(uid)
-				connections[curConnNum].PackageName = result["packageName"]
-			} else if l4, result := historianutils.SubexpNames(connLine4RE, line); l4 {
-				n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
-				if err != nil {
-					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-						"%s: connection(%d): error parsing sensorNumber %v:%v",
-						parseConnErrStr, curConnNum, result["sensorNumber"],
-						err))
-					continue
-				}
-				sensorNumber := int32(n)
-				connections[curConnNum].SensorNumber = sensorNumber
-				pendingFlush, err := strconv.Atoi(result["pendingFlush"])
-				if err != nil {
-					p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
-						"%s: connection(%d): error parsing pendingFlush %v:%v",
-						parseConnErrStr, curConnNum, result["pendingFlush"],
-						err))
-					continue
-				}
-				connections[curConnNum].PendingFlush = int32(pendingFlush)
-				if activeSensor, exist := p.activeSensors[sensorNumber]; exist {
-					connections[curConnNum].SamplingRateHz =
-						activeSensor.samplingRateHz
-					connections[curConnNum].BatchingPeriodS =
-						activeSensor.batchingPeriodS
-				} else {
-					p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
-						"[Active Connection]: connection(%d): the sensor(%d)"+
-							" is not active according to the sensor device"+
-							" section", curConnNum, sensorNumber))
-					continue
+			connections[curConnNum].UID = int32(uid)
+			connections[curConnNum].PackageName = result["packageName"]
+		} else if l4, result := historianutils.SubexpNames(actConnLine4RE, line); l4 {
+			curConnNum, connections, p.parsingErrs, p.sensorErrs =
+				p.organizeSensorInfoForActiveConn(curConnNum, result, connections)
+		}
+	}
+
+	// Build the new map that uses identifier to look up relevant active
+	// connection information.
+	for _, conn := range connections {
+		identifier := fmt.Sprintf("%d,%d,%s", conn.SensorNumber, conn.UID,
+			conn.PackageName)
+		p.activeConns[identifier] = conn
+	}
+	return p.parsingErrs, p.sensorErrs
+}
+
+// organizeSensorInfoForDirectConn is a helper function that specifically
+// handle the sensors' information parsed for each direct connection.
+// A special case it handles is when there are multiple sensors being activated
+// by one direct connection, then multiple direct connection objects will be
+// created.
+func (p parser) organizeSensorInfoForDirectConn(connNum int32,
+	result map[string]string, connections map[int32]*sipb.DirectConn) (int32,
+	map[int32]*sipb.DirectConn, []error, []error) {
+	n, err := strconv.ParseInt(result["sensorNumber"], 0, 32)
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: direct connection(%d): error parsing sensorNumber %v:%v",
+			parseConnErrStr, connNum, result["sensorNumber"], err))
+		return connNum, nil, p.parsingErrs, p.sensorErrs
+	}
+	sensorNumber := int32(n)
+	rateLevel, err := strconv.Atoi(result["rateLevel"])
+	if err != nil {
+		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+			"%s: connection(%d): error parsing rate level %v:%v",
+			parseConnErrStr, connNum, result["rateLevel"], err))
+		return connNum, nil, p.parsingErrs, p.sensorErrs
+	}
+
+	if connections[connNum].SensorNumber != -1 {
+		newConnNum := connNum + 1
+		newConn := &sipb.DirectConn{
+			Number:                 newConnNum,
+			PackageName:            connections[connNum].PackageName,
+			HALChannelHandle:       connections[connNum].HALChannelHandle,
+			HasSensorserviceRecord: false,
+			Source:                 sensorDump,
+		}
+		connections[newConnNum] = newConn
+		connNum = newConnNum
+	}
+	connections[connNum].SensorNumber = sensorNumber
+	connections[connNum].RateLevel = int32(rateLevel)
+	return connNum, connections, p.parsingErrs, p.sensorErrs
+}
+
+// extractDirectConnInfo extracts direct connections information found in
+// the sensorservice dump of a bugreport.
+func (p parser) extractDirectConnInfo() ([]error, []error) {
+	curConnNum := int32(0)
+	// connections is a map from direct connection number to information
+	// for the relevant connection.
+	connections := make(map[int32]*sipb.DirectConn)
+
+	for p.valid() {
+		line := p.line()
+		// The section stops when reaching the previous registration section.
+		if m, _ := historianutils.SubexpNames(prevRegistrationRE, line); m {
+			p.prevline()
+			break
+		}
+
+		if m, _ := historianutils.SubexpNames(dirConnLine1RE, line); m {
+			curConnNum++
+			if _, ok := connections[curConnNum]; !ok {
+				connections[curConnNum] = &sipb.DirectConn{
+					Number:                 curConnNum,
+					PackageName:            ``,
+					HALChannelHandle:       -1,
+					SensorNumber:           -1,
+					HasSensorserviceRecord: false,
+					Source:                 sensorDump,
 				}
 			}
+		} else if m, result := historianutils.SubexpNames(dirConnLine2RE, line); m {
+			connections[curConnNum].PackageName = result["packageName"]
+			halHandle, err := strconv.Atoi(result["halHandle"])
+			if err != nil {
+				p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
+					"%s: connection(%d): error parsing uid %v:%v",
+					parseConnErrStr, curConnNum, result["uid"], err))
+				continue
+			}
+			connections[curConnNum].HALChannelHandle = int32(halHandle)
+		} else if m, result := historianutils.SubexpNames(dirConnLine3RE, line); m {
+			curConnNum, connections, p.parsingErrs, p.sensorErrs =
+				p.organizeSensorInfoForDirectConn(curConnNum, result, connections)
 		}
 	}
 
@@ -564,7 +723,7 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 	// connection information.
 	for _, conn := range connections {
 		identifier := fmt.Sprintf("%d,%s", conn.SensorNumber, conn.PackageName)
-		p.activeConns[identifier] = conn
+		p.directConns[identifier] = conn
 	}
 	return p.parsingErrs, p.sensorErrs
 }
@@ -572,7 +731,7 @@ func (p parser) extractActiveConnInfo() ([]error, []error) {
 // createTimestampMs is a helper function that parses the time information for
 // one line and generates the timestamp in ms. It also accomodate the case
 // where the time information includes date.
-func (p *parser) createTimestampMs(line string, result map[string]string) int64 {
+func (p *parser) createTimestampMs(line string, result map[string]string) (int64, []error) {
 	hasDate, date := historianutils.SubexpNames(timeLayoutRE, line)
 	var timestampMs int64
 	var timestampErr error
@@ -582,14 +741,14 @@ func (p *parser) createTimestampMs(line string, result map[string]string) int64 
 			p.parsingErrs = append(p.parsingErrs,
 				fmt.Errorf("%s: error parsing month value for line %v: %v",
 					parseRegErrStr, line, timestampErr))
-			return -1
+			return -1, p.parsingErrs
 		}
 		day, err := strconv.Atoi(date["day"])
 		if err != nil {
 			p.parsingErrs = append(p.parsingErrs,
 				fmt.Errorf("%s: error parsing day value for line %v: %v",
 					parseRegErrStr, line, timestampErr))
-			return -1
+			return -1, p.parsingErrs
 		}
 		timestampMs, timestampErr = p.fullTimestampInMs(month, day,
 			result["time"])
@@ -601,12 +760,12 @@ func (p *parser) createTimestampMs(line string, result map[string]string) int64 
 		p.parsingErrs = append(p.parsingErrs,
 			fmt.Errorf("%s: error parsing time information for line %v: %v",
 				parseRegErrStr, line, timestampErr))
-		return -1
+		return -1, p.parsingErrs
 	}
 	if p.earliestTimestampMs > timestampMs {
 		p.earliestTimestampMs = timestampMs
 	}
-	return timestampMs
+	return timestampMs, p.parsingErrs
 }
 
 // checkSamplingBatchingData is a helper function that checks whether the
@@ -614,8 +773,8 @@ func (p *parser) createTimestampMs(line string, result map[string]string) int64 
 // match the values obtained from the active connection section.
 // [Active Sensor] errors will be reported if there is a mis-match.
 func (p *parser) checkSamplingBatchingData(packageName string,
-	sensorNumber int32, samplingRateHz, batchingPeriodS float64) {
-	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+	sensorNumber, uid int32, samplingRateHz, batchingPeriodS float64) []error {
+	identifier := fmt.Sprintf("%d,%d,%s", sensorNumber, uid, packageName)
 	conn := p.activeConns[identifier]
 	if samplingRateHz != conn.SamplingRateHz {
 		p.sensorErrs = append(p.sensorErrs, fmt.Errorf(
@@ -637,16 +796,17 @@ func (p *parser) checkSamplingBatchingData(packageName string,
 			p.activeConns[identifier].BatchingPeriodS = batchingPeriodS
 		}
 	}
+	return p.sensorErrs
 }
 
 // processActivation is a helper function that process the activation
 // statement in the sensorservice dump.
-func (p *parser) processActivation(timestampMs int64, sensorNumber int32,
-	uid int, packageName, l string) {
+func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
+	packageName, l string) ([]error, []error) {
 	_, result := historianutils.SubexpNames(addRegistrationRE, l)
 	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
-	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+	identifier := fmt.Sprintf("%d,%d,%s", sensorNumber, uid, packageName)
 	sensorName := p.sensors[sensorNumber].Name
 
 	samplingPeriodUs, err := strconv.Atoi(result["samplingPeriodUs"])
@@ -654,14 +814,14 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber int32,
 		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
 			"%s: error parsing samplingPeriod %v us for line %v: %v",
 			parseRegErrStr, result["samplingPeriodUs"], l, err))
-		return
+		return p.parsingErrs, p.sensorErrs
 	}
 	batchingPeriodUs, err := strconv.Atoi(result["batchingPeriodUs"])
 	if err != nil {
 		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
 			"%s: error parsing batchingPeriod %v us for line %v: %v",
 			parseRegErrStr, result["batchingPeriodUs"], l, err))
-		return
+		return p.parsingErrs, p.sensorErrs
 	}
 	samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
 	batchingPeriodS := math.Round(float64(batchingPeriodUs)*1e-04) / 100
@@ -671,7 +831,7 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber int32,
 		// If there is no history of de-activating a subscription,
 		// the subscription has to be active.
 		if conn, isActive := p.activeConns[identifier]; isActive {
-			p.checkSamplingBatchingData(packageName, sensorNumber,
+			p.checkSamplingBatchingData(packageName, sensorNumber, int32(uid),
 				samplingRateHz, batchingPeriodS)
 			// For active connection, set current time as the end time
 			// for the ongoing subscription event.
@@ -716,13 +876,14 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber int32,
 				value, "")
 		}
 	}
+	return p.parsingErrs, p.sensorErrs
 }
 
 // processDeActivation is a helper function that processes the deactivation
 // statement in the sensorservice dump.
-func (p *parser) processDeActivation(timestampMs int64, sensorNumber int32,
-	packageName string) {
-	identifier := fmt.Sprintf("%d,%s", sensorNumber, packageName)
+func (p *parser) processDeActivation(timestampMs int64, sensorNumber, uid int32,
+	packageName string) []error {
+	identifier := fmt.Sprintf("%d,%d,%s", sensorNumber, uid, packageName)
 	if event, exist := p.history[identifier]; exist {
 		// The current subscription combo has been seen.
 		if event.StartMs == -1 {
@@ -750,6 +911,7 @@ func (p *parser) processDeActivation(timestampMs int64, sensorNumber int32,
 		}
 		p.history[identifier] = eventInfo
 	}
+	return p.sensorErrs
 }
 
 // extractRegistrationHistory extracts all previous registration information
@@ -772,7 +934,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 		}
 
 		// Get the timestamp of the record.
-		timestampMs := p.createTimestampMs(l, result)
+		var timestampMs int64
+		timestampMs, p.parsingErrs = p.createTimestampMs(l, result)
 		if timestampMs == -1 {
 			continue
 		}
@@ -804,9 +967,11 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 		}
 
 		if isAdd {
-			p.processActivation(timestampMs, sensorNumber, uid, packageName, l)
+			p.parsingErrs, p.sensorErrs = p.processActivation(timestampMs,
+				sensorNumber, int32(uid), packageName, l)
 		} else {
-			p.processDeActivation(timestampMs, sensorNumber, packageName)
+			p.sensorErrs = p.processDeActivation(timestampMs, sensorNumber,
+				int32(uid), packageName)
 		}
 	}
 
