@@ -1,5 +1,5 @@
 <!--
-Copyright 2016 Google LLC. All rights reserved.
+Copyright 2016-2020 Google LLC. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
 this file except in compliance with the License. You may obtain a copy of the
 License at
@@ -58,6 +58,9 @@ specific language governing permissions and limitations under the License.
           <li id="tab-historian-custom" class="sdk-version-21" data-toggle="tooltip" title="Data visualization for choosing a custom set of events">
             <a href="#historian-custom" data-toggle="tab">Custom</a>
           </li>
+          <li id="tab-historian-sensor" class="sensor-historian" data-toggle="tooltip" title="Data visualization for sensor activity">
+            <a href="#historian-sensor" data-toggle="tab">Sensor</a>
+          </li>
           <li id="tab-historian" data-toggle="tooltip" title="Data visualization for history stats, version 1">
             <a href="#historian" data-toggle="tab">Historian</a>
           </li>
@@ -91,6 +94,10 @@ specific language governing permissions and limitations under the License.
           </div>
           <!-- Custom tab -->
           <div id="historian-custom" class="tab-pane fade" >
+            {{template "historianv2" .}}
+          </div>
+          <!-- Sensor historian tab -->
+          <div id="historian-sensor" class="tab-pane fade" >
             {{template "historianv2" .}}
           </div>
           <!-- historian v1 -->

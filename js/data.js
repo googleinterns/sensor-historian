@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -499,8 +499,11 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
         if (!overlaps) {
           return;
         }
-        if (series.type == 'int' || series.type == 'float' ||
-            series.type == 'string' || series.type == 'bool') {
+        // For sensor activities, we do not reset the start/end time.
+        if ((series.source != 
+              historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) &&
+            (series.type == 'int' || series.type == 'float' ||
+             series.type == 'string' || series.type == 'bool')) {
           // These metrics represent state and should never overlap.
           // Sometimes the data gets mangled and they do, in which
           // case we need to fix it to ensure it displays at all.
@@ -1454,6 +1457,15 @@ historian.data.ClusterEntry = function(d, forceSingleCount) {
   /** @type {number} */
   this.clusteredCount = 0;
 
+  // This field is for sensor's information only.
+  /** @type {number} */
+  this.sensorNum = 0;
+  
+  // This field is for sensor's information only. 
+  // It records the max sampling rate seen in the cluster.
+  /** @type {number} */
+  this.maxRate = 0;
+
   /** @type {number} */
   this.activeDuration = 0;
 
@@ -1487,9 +1499,10 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
   var entries = d.services || [d];
 
   var totalCount = 0;
+  var maxRate = 0;
+  var sensorNum = 0;
   entries.forEach(function(entry) {
     var key = historian.data.ClusterEntry.key_(entry);
-
     if (!(key in this.clusteredValues)) {
       this.clusteredValues[key] = {
         count: 0,
@@ -1499,6 +1512,15 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
         extra: []
       };
     }
+
+    if ((typeof entry.value) == "string" && 
+      (entry.value.includes("Sensorservice Dump"))){
+      var v = entry.value.split(',');
+      var curRate = parseFloat(v[6]);
+      maxRate = (curRate > maxRate) ? curRate: maxRate;
+      sensorNum = parseInt(v[2]);
+    }
+
     // Id can be zero, so don't use falsy check.
     var hasId = entry.hasOwnProperty('id');
 
@@ -1524,6 +1546,8 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
     this.clusteredValues[key].duration += duration;
   }, this);
   this.clusteredCount += (forceSingleCount) ? 1 : totalCount;
+  this.maxRate = maxRate;
+  this.sensorNum = sensorNum;
 };
 
 

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -407,6 +407,9 @@ historian.Bars.prototype.renderLabels_ = function() {
       '<b>' + group.name + '</b>',
       'From logs: ' + Object.keys(logSources).join(', ')
     ];
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+      lines.push("Client count:");
+    }
     var desc = historian.metrics.descriptors[group.name];
     if (desc) {
       // Text help descriptor.
@@ -778,6 +781,22 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             }
             return series.color(eventType);
         }
+        // Color for sensor historian is specifically chosen.
+        if (series.source == 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+            var colorScale = '>=8';
+            if (bar.clusteredCount < 2){
+              colorScale = '1';
+            } else if (bar.clusteredCount < 4){
+              colorScale = '2-3';
+            } else if (bar.clusteredCount < 6){
+              colorScale = '4-5';
+            } else if (bar.clusteredCount < 8){
+              colorScale = '6-7';
+            }
+            var baseColor = series.color(colorScale);
+            return baseColor;
+          }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
           return series.color(bar.clusteredCount);
@@ -788,8 +807,29 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
+      var opacity = function(bar) {
+        if (series.source != 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+            return 1;
+        }
+        var curRate = bar.maxRate;
+        var sensor = historian.sensorsInfo.Sensors[bar.sensorNum];
+        var opacity = 0.4;
+        // For one-shot sensor, opacity is set to be 0.4.
+        if (sensor.RequestMode == 2){
+          return opacity;
+        }
+        if (curRate > 0.3 * sensor.MaxRateHz){
+          opacity = 0.7;
+        }else if (curRate > 0.6 * sensor.MaxRateHz){
+          opacity = 1;
+        }
+        return opacity
+      }
+
       merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
           .attr('stroke', color)
+          .style('opacity', opacity)
           .style('display', showBars ? 'inline' : 'none');
       bars.exit().remove();
     }.bind(this));
@@ -1257,6 +1297,9 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     case historian.metrics.Csv.STRICT_MODE_VIOLATION:
       return this.createSortedTable_(series.name, cluster);
     default:
+      if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        return this.createSensorTable_(cluster.getSortedValues(false));
+      }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1264,6 +1307,71 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
           series, cluster.getSortedValues(
           series.name == historian.metrics.KERNEL_UPTIME), cluster);
   }
+};
+
+/**
+ * Creates a table to display the sensor entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorTable_ = function(values){
+  var headRow = [
+    'Start',
+    'End',
+    'UID',
+    'Package Name',
+  ];
+  if (!values[0].value.includes("ONE_SHOT")){
+    headRow.push('Sampling Rate(Hz)');
+    headRow.push('Batching Period(s)');
+  }
+  headRow.push('Source');
+  headRow.push('Total Duration');
+
+  var highlightActiveConn = [];
+  var onChange0SamplingPeriod = [];
+  var bodyRows = values.map(function(entry, index) {
+    var v = entry.value.split(',');
+
+    var duration = historian.time.formatDuration(entry.duration);
+    
+    // Highlight the row related to active connection.
+    if (v[v.length - 1] == "isActiveConn"){
+      highlightActiveConn.push(index);
+    }
+    // Batching Period = -1 is a default value set for active connections 
+    // without a history.
+    var batching = (v[9] == "-1.00") || (v[9] == "0.00")? "Not batching" : v[9];
+
+    if ((v[5].includes("ON_CHANGE")) && v[8] == "-1.00"){
+      onChange0SamplingPeriod.push(index);
+    }
+
+    return headRow.length > 6 ? 
+    [v[0], v[2], v[6], v[7], v[8], batching, v[10], duration] :
+    [v[0], v[2], v[6], v[7], v[10], duration];
+  });
+
+  highlightActiveConn.forEach(function(row){
+    bodyRows[row].forEach(function(value, col){
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'highlighted-cell'
+      };
+    });
+  });
+
+  onChange0SamplingPeriod.forEach(function(row){
+    bodyRows[row][4] = {
+      value: "on-change",
+    };
+  });
+
+  return {header: headRow, body: bodyRows};
 };
 
 

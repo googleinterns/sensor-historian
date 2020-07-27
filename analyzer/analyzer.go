@@ -47,9 +47,11 @@ import (
 	"github.com/googleinterns/sensor-historian/parseutils"
 	"github.com/googleinterns/sensor-historian/powermonitor"
 	"github.com/googleinterns/sensor-historian/presenter"
+	"github.com/googleinterns/sensor-historian/sensorserviceutils"
 	"github.com/googleinterns/sensor-historian/wearable"
 
 	bspb "github.com/googleinterns/sensor-historian/pb/batterystats_proto"
+	sipb "github.com/googleinterns/sensor-historian/pb/sensorsinfo_proto"
 	sessionpb "github.com/googleinterns/sensor-historian/pb/session_proto"
 	usagepb "github.com/googleinterns/sensor-historian/pb/usagestats_proto"
 )
@@ -72,6 +74,7 @@ const (
 	powerMonitorLog = "Power Monitor"
 	systemLog       = "System"
 	wearableLog     = "Wearable"
+	sensorService   = "Sensorservice Dump"
 
 	// Analyzable file types.
 	bugreportFT    = "bugreport"
@@ -128,12 +131,16 @@ type uploadResponse struct {
 	DeviceCapacity      float32                  `json:"deviceCapacity"`
 	HistogramStats      presenter.HistogramStats `json:"histogramStats"`
 	TimeToDelta         map[string]string        `json:"timeToDelta"`
-	CriticalError       string                   `json:"criticalError"` // Critical errors are ones that cause parsing of important data to abort early and should be shown prominently to the user.
-	Note                string                   `json:"note"`          // A message to show to the user that they should be aware of.
-	FileName            string                   `json:"fileName"`
-	Location            string                   `json:"location"`
-	OverflowMs          int64                    `json:"overflowMs"`
-	IsDiff              bool                     `json:"isDiff"`
+	// Critical errors are ones that cause parsing of important data to abort
+	// early and should be shown prominently to the user.
+	CriticalError string `json:"criticalError"`
+	// A message to show to the user that they should be aware of.
+	Note        string               `json:"note"`
+	FileName    string               `json:"fileName"`
+	Location    string               `json:"location"`
+	OverflowMs  int64                `json:"overflowMs"`
+	IsDiff      bool                 `json:"isDiff"`
+	SensorsInfo *sipb.AllSensorsInfo `json:"sensorsInfo"`
 }
 
 type uploadResponseCompare struct {
@@ -658,6 +665,10 @@ func writeTempFile(contents string) (string, error) {
 // saved as separate reports.
 func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string) error {
 
+	doSensoservice := func(ch chan sensorserviceutils.OutputData, contents string, meta *bugreportutils.MetaInfo) {
+		ch <- sensorserviceutils.Parse(contents, meta)
+	}
+
 	doActivity := func(ch chan activity.LogsData, contents string, pkgs []*usagepb.PackageInfo) {
 		ch <- activity.Parse(pkgs, contents)
 	}
@@ -790,6 +801,8 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		broadcastsCh := make(chan csvData)
 		dmesgCh := make(chan dmesg.Data)
 		wearableCh := make(chan string)
+		sensorserviceCh := make(chan sensorserviceutils.OutputData)
+
 		var checkinL, checkinE checkinData
 		var warnings []string
 		var bsStats *bspb.BatteryStats
@@ -837,6 +850,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			go doDmesg(dmesgCh, late.contents)
 			go doWearable(wearableCh, late.dt.Location().String(), late.contents)
 			go doSummaries(summariesCh, bsL, pkgsL)
+			go doSensoservice(sensorserviceCh, late.contents, late.meta)
 
 			checkinL = <-checkinLCh
 			errs = append(errs, checkinL.err...)
@@ -865,14 +879,20 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		var broadcastsOutput csvData
 		var dmesgOutput dmesg.Data
 		var wearableOutput string
+		var sensorserviceOutput sensorserviceutils.OutputData
 
 		if supV {
+			sensorserviceOutput = <-sensorserviceCh
 			summariesOutput = <-summariesCh
 			activityManagerOutput = <-activityManagerCh
 			broadcastsOutput = <-broadcastsCh
 			dmesgOutput = <-dmesgCh
 			wearableOutput = <-wearableCh
-			errs = append(errs, append(broadcastsOutput.errs, append(dmesgOutput.Errs, append(summariesOutput.errs, activityManagerOutput.Errs...)...)...)...)
+			errs = append(errs, append(sensorserviceOutput.ParsingErrs,
+				append(broadcastsOutput.errs,
+					append(dmesgOutput.Errs,
+						append(summariesOutput.errs,
+							activityManagerOutput.Errs...)...)...)...)...)
 		}
 
 		warnings = append(warnings, activityManagerOutput.Warnings...)
@@ -903,6 +923,10 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			{
 				Source: broadcastsLog,
 				CSV:    broadcastsOutput.csv,
+			},
+			{
+				Source: sensorService,
+				CSV:    sensorserviceOutput.CSV,
 			},
 		}
 		for s, l := range activityManagerOutput.Logs {
@@ -950,6 +974,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			Location:        late.dt.Location().String(),
 			OverflowMs:      summariesOutput.overflowMs,
 			IsDiff:          diff,
+			SensorsInfo:     sensorserviceOutput.SensorInfo,
 		})
 		pd.data = append(pd.data, data)
 
