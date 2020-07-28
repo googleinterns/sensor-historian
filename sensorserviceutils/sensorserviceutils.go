@@ -305,7 +305,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 			continue
 		}
 	}
-	p.sensors = p.creatUnseenActiveConnectionHistory()
+	p.creatUnseenActiveConnectionHistory()
 	return OutputData{p.buf.String(), p.allSensorInfo(),
 		p.parsingErrs, p.sensorErrs}
 }
@@ -381,19 +381,17 @@ func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) m
 		collisions = append(collisions, curNum)
 		sensorCheck[conflictName] = collisions
 		sensor := &sipb.Sensor{
-			Name:          curSensorName,
-			Type:          sensorInfo.Type,
-			Version:       sensorInfo.Version,
-			Number:        sensorInfo.Number,
-			RequestMode:   sipb.RequestMode(sensorInfo.RequestMode),
-			MaxRateHz:     sensorInfo.MaxRateHz,
-			MinRateHz:     sensorInfo.MinRateHz,
-			Batch:         sensorInfo.Batch,
-			Max:           sensorInfo.Max,
-			Reserved:      sensorInfo.Reserved,
-			WakeUp:        sensorInfo.WakeUp,
-			Subscriptions: make([]*sipb.SubscriptionInfo, 1),
-			ActiveConns:   make([]*sipb.ActiveConn, 1),
+			Name:        curSensorName,
+			Type:        sensorInfo.Type,
+			Version:     sensorInfo.Version,
+			Number:      sensorInfo.Number,
+			RequestMode: sipb.RequestMode(sensorInfo.RequestMode),
+			MaxRateHz:   sensorInfo.MaxRateHz,
+			MinRateHz:   sensorInfo.MinRateHz,
+			Batch:       sensorInfo.Batch,
+			Max:         sensorInfo.Max,
+			Reserved:    sensorInfo.Reserved,
+			WakeUp:      sensorInfo.WakeUp,
 		}
 		p.sensors[curNum] = sensor
 	}
@@ -801,7 +799,7 @@ func (p *parser) checkSamplingBatchingData(packageName string,
 // processActivation is a helper function that process the activation
 // statement in the sensorservice dump.
 func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
-	packageName, l string) (map[int32]*sipb.Sensor, []error, []error) {
+	packageName, l string) ([]error, []error) {
 	_, result := historianutils.SubexpNames(addRegistrationRE, l)
 	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
@@ -813,14 +811,14 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
 			"%s: error parsing samplingPeriod %v us for line %v: %v",
 			parseRegErrStr, result["samplingPeriodUs"], l, err))
-		return p.sensors, p.parsingErrs, p.sensorErrs
+		return p.parsingErrs, p.sensorErrs
 	}
 	batchingPeriodUs, err := strconv.Atoi(result["batchingPeriodUs"])
 	if err != nil {
 		p.parsingErrs = append(p.parsingErrs, fmt.Errorf(
 			"%s: error parsing batchingPeriod %v us for line %v: %v",
 			parseRegErrStr, result["batchingPeriodUs"], l, err))
-		return p.sensors, p.parsingErrs, p.sensorErrs
+		return p.parsingErrs, p.sensorErrs
 	}
 	samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
 	batchingPeriodS := math.Round(float64(batchingPeriodUs)*1e-04) / 100
@@ -832,19 +830,6 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 		if conn, isActive := p.activeConns[identifier]; isActive {
 			p.checkSamplingBatchingData(packageName, sensorNumber, int32(uid),
 				samplingRateHz, batchingPeriodS)
-			subscriptions := p.sensors[sensorNumber].Subscriptions
-			event := &sipb.SubscriptionInfo{
-				StartMs:         timestampMs,
-				EndMs:           referenceTimestampMs,
-				SensorNumber:    sensorNumber,
-				UID:             uid,
-				PackageName:     packageName,
-				SamplingRateHz:  samplingRateHz,
-				BatchingPeriodS: batchingPeriodS,
-				Source:          sensorDump,
-			}
-			subscriptions = append(subscriptions, event)
-			p.sensors[sensorNumber].Subscriptions = subscriptions
 			// For active connection, set current time as the end time
 			// for the ongoing subscription event.
 			end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
@@ -888,13 +873,9 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 				samplingRateHz, batchingPeriodS, sensorDump)
 			p.csvState.Print(sensorName, "string", timestampMs, eventInfo.EndMs,
 				value, "")
-
-			subscriptions := p.sensors[sensorNumber].Subscriptions
-			subscriptions = append(subscriptions, eventInfo)
-			p.sensors[sensorNumber].Subscriptions = subscriptions
 		}
 	}
-	return p.sensors, p.parsingErrs, p.sensorErrs
+	return p.parsingErrs, p.sensorErrs
 }
 
 // processDeActivation is a helper function that processes the deactivation
@@ -985,9 +966,8 @@ func (p *parser) extractRegistrationHistory() ([]error, []error) {
 		}
 
 		if isAdd {
-			p.sensors, p.parsingErrs, p.sensorErrs =
-				p.processActivation(timestampMs, sensorNumber, int32(uid),
-					packageName, l)
+			p.parsingErrs, p.sensorErrs = p.processActivation(timestampMs,
+				sensorNumber, int32(uid), packageName, l)
 		} else {
 			p.sensorErrs = p.processDeActivation(timestampMs, sensorNumber,
 				int32(uid), packageName)
@@ -1012,7 +992,7 @@ func (slice activeConns) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func (p parser) creatUnseenActiveConnectionHistory() map[int32]*sipb.Sensor {
+func (p parser) creatUnseenActiveConnectionHistory() {
 	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
 		p.referenceDay, p.referenceTime)
 
@@ -1039,22 +1019,7 @@ func (p parser) creatUnseenActiveConnectionHistory() map[int32]*sipb.Sensor {
 		sensorName := p.sensors[conn.SensorNumber].Name
 		p.csvState.Print(sensorName, "string", p.earliestTimestampMs,
 			referenceTimestampMs, value, "")
-
-		subscriptions := p.sensors[conn.SensorNumber].Subscriptions
-		event := &sipb.SubscriptionInfo{
-			StartMs:         p.earliestTimestampMs,
-			EndMs:           referenceTimestampMs,
-			SensorNumber:    conn.SensorNumber,
-			UID:             conn.UID,
-			PackageName:     conn.PackageName,
-			SamplingRateHz:  samplingRateHz,
-			BatchingPeriodS: batchingPeriodS,
-			Source:          sensorDump,
-		}
-		subscriptions = append(subscriptions, event)
-		p.sensors[conn.SensorNumber].Subscriptions = subscriptions
 	}
-	return p.sensors
 }
 
 func validMonth(m int) bool {

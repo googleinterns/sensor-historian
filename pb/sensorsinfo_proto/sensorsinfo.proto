@@ -76,8 +76,6 @@ message Sensor{
     int32 Reserved = 9;
     bool Batch = 10;
     bool WakeUp = 11;
-    repeated SubscriptionInfo Subscriptions = 12;
-    repeated ActiveConn ActiveConns = 13;
 }
 
 message App{
