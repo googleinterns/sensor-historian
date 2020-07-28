@@ -1205,6 +1205,32 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+    var sensor;
+    historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+      // Accomodate the case where sensor number is 0, the protobuf
+      // message does not have the field for Number
+      if (cluster.sensorNum == 0) {
+        if (!sensorObj.Number) {
+          sensor = sensorObj;
+        }
+      } else if (sensorObj.Number == cluster.sensorNum) {
+        sensor = sensorObj;
+      }
+    });
+    var level = 'Low';
+    if (sensor.RequestMode == 2) {
+      level = 'Medium';
+    } else if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
+      level = 'High';
+    } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
+      level = 'Medium';
+    }
+    formattedLines.push('Max Sampling Rate in the interval: ' + 
+      cluster.maxRate + 'Hz (' + level + ')');
+    formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
+      sensor.MaxRateHz + 'Hz');
+  }
 
   if (series.name == historian.metrics.Csv.CPU_RUNNING) {
     var powerEvents = cluster.sorted
