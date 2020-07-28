@@ -19,6 +19,17 @@ package sensorsinfo;
 
 option go_package = "github.com/googleinterns/sensor-historian/pb/sensorsinfo_proto;sensorsinfo";
 
+// DirectConn contains information about a direct connection.
+message DirectConn{
+    int32 Number = 1;
+    string PackageName = 2;
+    int32 HALChannelHandle = 3;
+    int32 SensorNumber = 4;
+    int32 RateLevel = 5;
+    bool HasSensorserviceRecord = 6;
+    string Source = 7;
+}
+
 // ActiveConn contains information about an active connection.
 message ActiveConn{
     string PackageName = 1;
@@ -78,6 +89,7 @@ message App{
 
 message AllSensorsInfo{
     repeated ActiveConn AllActiveConns = 1;
-    repeated Sensor Sensors = 2;
-    repeated App Apps = 3;
+    repeated DirectConn AllDirectConns = 2;
+    repeated Sensor Sensors = 3;
+    repeated App Apps = 4;
 }
