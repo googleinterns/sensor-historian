@@ -304,10 +304,6 @@ rect.bar:hover, circle.bar:hover {
   background-color: #FFB6C1;
 }
 
-.activeConn-cell {
-  background-color: #D4FF32;
-}
-
 #copy span {
   float: left;
   font-weight: bold;
