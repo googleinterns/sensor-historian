@@ -1218,18 +1218,19 @@ historian.Bars.prototype.tooltipText_ = function(
         sensor = sensorObj;
       }
     });
+    // Show the sampling rate information in the floating window.
     var level = 'Low';
-    if (sensor.RequestMode == 2) {
-      level = 'Medium';
-    } else if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
-      level = 'High';
-    } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
-      level = 'Medium';
+    if (sensor.RequestMode != 2) {
+      if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
+        level = 'High';
+      } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
+        level = 'Medium';
+      }
+      formattedLines.push('Max Sampling Rate in the interval: ' + 
+        cluster.maxRate + 'Hz (' + level + ')');
+      formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
+        sensor.MaxRateHz + 'Hz');
     }
-    formattedLines.push('Max Sampling Rate in the interval: ' + 
-      cluster.maxRate + 'Hz (' + level + ')');
-    formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
-      sensor.MaxRateHz + 'Hz');
   }
 
   if (series.name == historian.metrics.Csv.CPU_RUNNING) {
