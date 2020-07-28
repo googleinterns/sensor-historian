@@ -1397,7 +1397,6 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
   headRow.push('Total Duration');
 
   var highlightActiveConn = [];
-  var onChange0SamplingPeriod = [];
   var bodyRows = values.map(function(entry, index) {
     var v = entry.value.split(',');
     var startMs = parseInt(v[1],10);
@@ -1412,12 +1411,13 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
     // without a history.
     var batching = (v[9] == "-1.00") || (v[9] == "0.00")? "Not batching" : v[9];
 
-    if ((v[5].includes("ON_CHANGE")) && v[8] == "-1.00") {
-      onChange0SamplingPeriod.push(index);
+    var samplingRate = v[8]
+    if ((v[5].includes("ON_CHANGE")) && samplingRate == "-1.00") {
+      samplingRate = "on-change"
     }
 
     return headRow.length > 6 ? 
-    [v[0], v[2], v[6], v[7], v[8], batching, v[10], durationOutput] :
+    [v[0], v[2], v[6], v[7], samplingRate, batching, v[10], durationOutput] :
     [v[0], v[2], v[6], v[7], v[10], durationOutput];
   });
 
@@ -1428,12 +1428,6 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
         classes: 'highlighted-cell'
       };
     });
-  });
-
-  onChange0SamplingPeriod.forEach(function(row) {
-    bodyRows[row][4] = {
-      value: "on-change"
-    };
   });
 
   return {header: headRow, body: bodyRows};
