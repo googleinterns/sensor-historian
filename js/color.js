@@ -32,7 +32,7 @@ goog.require('historian.time');
 /** @private {function(string): string} */
 historian.color.sensorColorA = d3.scaleOrdinal()
     .domain(['1', '2-4', '5-7', '>=8'])
-    .range(['#004D40', '#FFC107', '#1E88E5', '#D81B60']);
+    .range(['#00967d', '#FFC107', '#1E88E5', '#D81B60']);
 
 /**
  * Map from series name to color function.

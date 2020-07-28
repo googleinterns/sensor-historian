@@ -276,7 +276,7 @@ rect.bar:hover, circle.bar:hover {
   border-radius: 50%;
 }
 
-.legend-item.mediumRate {
+.legend-item.lowRate {
   background: repeating-linear-gradient(
     -45deg,
     white,
@@ -286,7 +286,7 @@ rect.bar:hover, circle.bar:hover {
   );
 }
 
-.legend-item.lowRate {
+.legend-item.mediumRate {
   background: repeating-linear-gradient(
     -45deg,
     white,
