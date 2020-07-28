@@ -408,7 +408,7 @@ historian.Bars.prototype.renderLabels_ = function() {
       'From logs: ' + Object.keys(logSources).join(', ')
     ];
     if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-      lines.push("Client count:");
+      lines.push("Color corresponds to client count:");
     }
     var desc = historian.metrics.descriptors[group.name];
     if (desc) {
@@ -427,6 +427,21 @@ historian.Bars.prototype.renderLabels_ = function() {
       }).prop('outerHTML');  // Convert the div to HTML.
       lines.push(rectHtml + entry.value);
     });
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+      lines.push("Pattern shows sampling rate:");
+      var low = $('<div/>', {
+        'class': 'legend-item lowRate',
+      }).prop('outerHTML');
+      lines.push(low + "Low");
+      var medium = $('<div/>', {
+        'class': 'legend-item mediumRate',
+      }).prop('outerHTML');
+      lines.push(medium + "Medium");
+      var high = $('<div/>', {
+        'class': 'legend-item highRate',
+      }).prop('outerHTML');
+      lines.push(high + "High");
+    }
     this.legendTooltip_ =
         new historian.Tooltip(lines, this.state_, 'help-tooltip');
   }.bind(this);
@@ -834,10 +849,10 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         // in the bar.
         if (sensor.RequestMode == 2) {
           samplingRate = 'medium';
-        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
-          samplingRate = 'medium';
         } else if (bar.maxRate > 0.6 * sensor.MaxRateHz) {
           samplingRate = 'high';
+        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
+          samplingRate = 'medium';
         }
         var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
         return fill;

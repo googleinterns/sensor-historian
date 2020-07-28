@@ -276,6 +276,30 @@ rect.bar:hover, circle.bar:hover {
   border-radius: 50%;
 }
 
+.legend-item.mediumRate {
+  background: repeating-linear-gradient(
+    -45deg,
+    white,
+    white 4px,
+    grey 4px,
+    grey 8px
+  );
+}
+
+.legend-item.lowRate {
+  background: repeating-linear-gradient(
+    -45deg,
+    white,
+    white 2px,
+    grey 2px,
+    grey 4px
+  );
+}
+
+.legend-item.highRate {
+  background-color: grey;
+}
+
 .highlighted-cell {
   background-color: #FFB6C1;
 }
