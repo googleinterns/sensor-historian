@@ -407,7 +407,7 @@ historian.Bars.prototype.renderLabels_ = function() {
       '<b>' + group.name + '</b>',
       'From logs: ' + Object.keys(logSources).join(', ')
     ];
-    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
       lines.push("Client count:");
     }
     var desc = historian.metrics.descriptors[group.name];
@@ -783,20 +783,18 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         }
         // Color for sensor historian is specifically chosen.
         if (series.source == 
-          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
-            var colorScale = '>=8';
-            if (bar.clusteredCount < 2){
-              colorScale = '1';
-            } else if (bar.clusteredCount < 4){
-              colorScale = '2-3';
-            } else if (bar.clusteredCount < 6){
-              colorScale = '4-5';
-            } else if (bar.clusteredCount < 8){
-              colorScale = '6-7';
-            }
-            var baseColor = series.color(colorScale);
-            return baseColor;
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+          var colorScale = ">=8";
+          if (bar.clusteredCount < 2) {
+            colorScale = "1";
+          } else if (bar.clusteredCount < 5) {
+            colorScale = "2-4";
+          } else if (bar.clusteredCount < 7) {
+            colorScale = "5-7";
           }
+          var baseColor = series.color(colorScale);
+          return baseColor;
+        }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
           return series.color(bar.clusteredCount);
@@ -807,41 +805,54 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
-      var opacity = function(bar) {
-        if (series.source != 
-          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
-            return 1;
-        }
-        var curRate = bar.maxRate;
+      var sensorPattern = function(bar) {
         var sensor;
-        historian.sensorsInfo.Sensors.forEach(function (sensorObj){
+        historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
           // Accomodate the case where sensor number is 0, the protobuf
           // message does not have the field for Number
           if (bar.sensorNum == 0) {
             if (!sensorObj.Number) {
               sensor = sensorObj;
             }
-          }else if (sensorObj.Number == bar.sensorNum) {
+          } else if (sensorObj.Number == bar.sensorNum) {
             sensor = sensorObj;
           }
         });
-        var opacity = 0.4;
-        // For one-shot sensor, opacity is set to be 0.4.
-        if (sensor.RequestMode == 2){
-          return opacity;
+
+        var color = 'red';
+        if (bar.clusteredCount < 2) {
+          color = 'green';
+        } else if (bar.clusteredCount < 5) {
+          color = 'yellow';
+        } else if (bar.clusteredCount < 7) {
+          color = 'blue';
         }
-        if (curRate > 0.3 * sensor.MaxRateHz){
-          opacity = 0.7;
-        }else if (curRate > 0.6 * sensor.MaxRateHz){
-          opacity = 1;
+            
+        var samplingRate = 'low';
+        // For one-shot sensor, samplingRate is set to be medium, otherwise
+        // set the samplingRate variable based on the max sampling rate occurs
+        // in the bar.
+        if (sensor.RequestMode == 2) {
+          samplingRate = 'medium';
+        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
+          samplingRate = 'medium';
+        } else if (bar.maxRate > 0.6 * sensor.MaxRateHz) {
+          samplingRate = 'high';
         }
-        return opacity
+        var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
+        return fill;
       }
 
-      merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
+      if (series.source == 
+        historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        merged.style('fill', sensorPattern)
           .attr('stroke', color)
-          .style('opacity', opacity)
           .style('display', showBars ? 'inline' : 'none');
+      } else {
+        merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
+        .attr('stroke', color)
+        .style('display', showBars ? 'inline' : 'none');
+      }
       bars.exit().remove();
     }.bind(this));
   }.bind(this));
@@ -1329,14 +1340,14 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
  *     The table header and body.
  * @private
  */
-historian.Bars.prototype.createSensorTable_ = function(values){
+historian.Bars.prototype.createSensorTable_ = function(values) {
   var headRow = [
     'Start',
     'End',
     'UID',
     'Package Name',
   ];
-  if (!values[0].value.includes("ONE_SHOT")){
+  if (!values[0].value.includes("ONE_SHOT")) {
     headRow.push('Sampling Rate(Hz)');
     headRow.push('Batching Period(s)');
   }
@@ -1368,8 +1379,8 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     [v[0], v[2], v[6], v[7], v[10], durationOutput];
   });
 
-  highlightActiveConn.forEach(function(row){
-    bodyRows[row].forEach(function(value, col){
+  highlightActiveConn.forEach(function(row) {
+    bodyRows[row].forEach(function(value, col) {
       bodyRows[row][col] = {
         value: value,
         classes: 'highlighted-cell'
@@ -1377,9 +1388,9 @@ historian.Bars.prototype.createSensorTable_ = function(values){
     });
   });
 
-  onChange0SamplingPeriod.forEach(function(row){
+  onChange0SamplingPeriod.forEach(function(row) {
     bodyRows[row][4] = {
-      value: "on-change",
+      value: "on-change"
     };
   });
 
