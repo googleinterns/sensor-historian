@@ -306,7 +306,6 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		}
 	}
 	p.creatUnseenActiveConnectionHistory()
-
 	return OutputData{p.buf.String(), p.allSensorInfo(),
 		p.parsingErrs, p.sensorErrs}
 }
@@ -382,19 +381,17 @@ func (p parser) updateSensorsInfo(sensors map[int32]bugreportutils.SensorInfo) m
 		collisions = append(collisions, curNum)
 		sensorCheck[conflictName] = collisions
 		sensor := &sipb.Sensor{
-			Name:          curSensorName,
-			Type:          sensorInfo.Type,
-			Version:       sensorInfo.Version,
-			Number:        sensorInfo.Number,
-			RequestMode:   sipb.RequestMode(sensorInfo.RequestMode),
-			MaxRateHz:     sensorInfo.MaxRateHz,
-			MinRateHz:     sensorInfo.MinRateHz,
-			Batch:         sensorInfo.Batch,
-			Max:           sensorInfo.Max,
-			Reserved:      sensorInfo.Reserved,
-			WakeUp:        sensorInfo.WakeUp,
-			Subscriptions: make([]*sipb.SubscriptionInfo, 1),
-			ActiveConns:   make([]*sipb.ActiveConn, 1),
+			Name:        curSensorName,
+			Type:        sensorInfo.Type,
+			Version:     sensorInfo.Version,
+			Number:      sensorInfo.Number,
+			RequestMode: sipb.RequestMode(sensorInfo.RequestMode),
+			MaxRateHz:   sensorInfo.MaxRateHz,
+			MinRateHz:   sensorInfo.MinRateHz,
+			Batch:       sensorInfo.Batch,
+			Max:         sensorInfo.Max,
+			Reserved:    sensorInfo.Reserved,
+			WakeUp:      sensorInfo.WakeUp,
 		}
 		p.sensors[curNum] = sensor
 	}
@@ -836,8 +833,9 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 			// For active connection, set current time as the end time
 			// for the ongoing subscription event.
 			end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-			value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start,
-				end, sensorNumber, p.sensors[sensorNumber].RequestMode,
+			value := fmt.Sprintf("%v,%v,%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s",
+				start, timestampMs, end, referenceTimestampMs,
+				sensorNumber, p.sensors[sensorNumber].RequestMode,
 				uid, packageName, samplingRateHz, batchingPeriodS,
 				sensorDump, "isActiveConn")
 			p.csvState.Print(sensorName, "string", timestampMs,
@@ -869,9 +867,10 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 			eventInfo.SamplingRateHz = samplingRateHz
 			eventInfo.BatchingPeriodS = batchingPeriodS
 			end := msToTime(eventInfo.EndMs).In(p.loc).Format(timeFormat)
-			value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
-				end, sensorNumber, p.sensors[sensorNumber].RequestMode,
-				uid, packageName, samplingRateHz, batchingPeriodS, sensorDump)
+			value := fmt.Sprintf("%v,%v,%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s", start,
+				timestampMs, end, eventInfo.EndMs, sensorNumber,
+				p.sensors[sensorNumber].RequestMode, uid, packageName,
+				samplingRateHz, batchingPeriodS, sensorDump)
 			p.csvState.Print(sensorName, "string", timestampMs, eventInfo.EndMs,
 				value, "")
 		}
@@ -1012,7 +1011,8 @@ func (p parser) creatUnseenActiveConnectionHistory() {
 		end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
 		samplingRateHz := conn.SamplingRateHz
 		batchingPeriodS := conn.BatchingPeriodS
-		value := fmt.Sprintf("%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s", start, end,
+		value := fmt.Sprintf("%v,%v,%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s",
+			start, p.earliestTimestampMs, end, referenceTimestampMs,
 			conn.SensorNumber, p.sensors[conn.SensorNumber].RequestMode,
 			conn.UID, conn.PackageName, samplingRateHz,
 			batchingPeriodS, conn.Source, "isActiveConn")
@@ -1046,8 +1046,8 @@ func (p *parser) fullTimestampInMs(month, day int, partialTimestamp string) (int
 	// year since it doesn't make sense for events to exist so long after
 	// the bugreport was taken.
 	// e.g. Reference date: March 2016,
-	//		Event month: October,
-	// 		year assumed to be 2015.
+	//      Event month: October,
+	//      year assumed to be 2015.
 	//
 	// If the bug report event log begins near the end of a year, and rolls over
 	// to the next year, the event would have taken place in the year preceding
