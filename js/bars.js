@@ -407,9 +407,6 @@ historian.Bars.prototype.renderLabels_ = function() {
       '<b>' + group.name + '</b>',
       'From logs: ' + Object.keys(logSources).join(', ')
     ];
-    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-      lines.push("Color corresponds to client count:");
-    }
     var desc = historian.metrics.descriptors[group.name];
     if (desc) {
       // Text help descriptor.
@@ -428,6 +425,7 @@ historian.Bars.prototype.renderLabels_ = function() {
       lines.push(rectHtml + entry.value);
     });
     if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+      lines.splice(2, 0, "Color corresponds to client count:");
       lines.push("Pattern shows sampling rate:");
       var low = $('<div/>', {
         'class': 'legend-item lowRate',
