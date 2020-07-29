@@ -28,7 +28,7 @@ import (
 func TestParseSet1(t *testing.T) {
 	meta := &bugreportutils.MetaInfo{
 		DeviceID:   `123456789012345678`,
-		SdkVersion: 21,
+		SdkVersion: 26,
 		Sensors: map[int32]bugreportutils.SensorInfo{
 			1: {
 				Name:        `BMI160 accelerometer`,
@@ -206,11 +206,11 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,18:07:00,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436292420000,1436292420000,"18:07:00,18:07:00,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer,string,1436292420000,1436292420000,"18:07:00,18:07:00,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -272,8 +272,8 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,18:07:00,4,CONTINUOUS,-1,,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,-1,,15.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -307,7 +307,6 @@ func TestParseSet1(t *testing.T) {
 				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
 				`Connection Number: 1 `,
 				`	Operating Mode: NORMAL`,
-				`	 com.google.android.location.collectionlib.w | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
 				`	 com.android.server.display.AutomaticBrightnessController | WakeLockRefCount 0 | uid 1000 | cache size 0 | max cache size 0`,
 				`	 RPR0521 light 0x00000007 | status: active | pending flush events 0 `,
 				`	 Window Orientation 0x0000001f | status: active | pending flush events 0 `,
@@ -330,6 +329,18 @@ func TestParseSet1(t *testing.T) {
 					OperatingMode:          "NORMAL",
 					PackageName:            "com.android.server.display.AutomaticBrightnessController",
 					UID:                    1000,
+					SensorNumber:           7,
+					PendingFlush:           0,
+					SamplingRateHz:         5,
+					BatchingPeriodS:        0.1,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 3,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.android.server.display.AutomaticBrightnessController",
+					UID:                    1000,
 					SensorNumber:           31,
 					PendingFlush:           0,
 					SamplingRateHz:         50,
@@ -340,8 +351,9 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436292420000,1436292420000,"18:07:00,18:07:00,31,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -404,8 +416,8 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 			wantSensorErrors: []error{
 				fmt.Errorf("[Active Connection]: connection(2): the sensor(4) is not active according to the sensor device section"),
@@ -525,11 +537,11 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 accelerometer,string,1436292001000,1436292420000,"18:00:01,18:07:00,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 Step counter,string,1436291941000,1436292420000,"17:59:01,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`RPR0521 light,string,1436290801000,1436292420000,"17:40:01,18:07:00,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436290211000,1436292420000,"17:30:11,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436290211000,1436292420000,"17:30:11,18:07:00,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer,string,1436292001000,1436292420000,"18:00:01,1436292001000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436290801000,1436292420000,"17:40:01,1436290801000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -646,11 +658,11 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 accelerometer,string,1436292001000,1436292420000,"18:00:01,18:07:00,1,CONTINUOUS,10182,civ,400.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 Step counter,string,1436291941000,1436292420000,"17:59:01,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`RPR0521 light,string,1436290801000,1436292420000,"17:40:01,18:07:00,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436290211000,1436292420000,"17:30:11,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436290211000,1436292420000,"17:30:11,18:07:00,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer,string,1436292001000,1436292420000,"18:00:01,1436292001000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,400.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436290801000,1436292420000,"17:40:01,1436290801000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 			wantSensorErrors: []error{
 				fmt.Errorf("[Active Connection]: connection(5): the sensor(1) is not active according to the sensor device section"),
@@ -783,14 +795,14 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292001000,1436292420000,"18:00:01,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436291941000,1436292420000,"17:59:01,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer,string,1436291671000,1436292420000,"17:54:31,18:07:00,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`RPR0521 light,string,1436291579000,1436291867000,"17:52:59,17:57:47,7,ON_CHANGE,321,AA,5.00,0.10,Sensorservice Dump",`,
-				`RPR0521 light,string,1436291403000,1436292420000,"17:50:03,18:07:00,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436290921000,1436292420000,"17:42:01,18:07:00,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 Step counter,string,1436290861000,1436291193000,"17:41:01,17:46:33,24,ON_CHANGE,135,CCC,4.00,0.00,Sensorservice Dump",`,
-				`BMP280 pressure,string,1436290809000,1436291327000,"17:40:09,17:48:47,4,CONTINUOUS,654,BB,15.00,0.00,Sensorservice Dump",`,
+				`BMI160 Step counter,string,1436292001000,1436292420000,"18:00:01,1436292001000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer,string,1436291671000,1436292420000,"17:54:31,1436291671000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436291579000,1436291867000,"17:52:59,1436291579000,17:57:47,1436291867000,7,ON_CHANGE,321,AA,5.00,0.10,Sensorservice Dump",`,
+				`RPR0521 light,string,1436291403000,1436292420000,"17:50:03,1436291403000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436290921000,1436292420000,"17:42:01,1436290921000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436290861000,1436291193000,"17:41:01,1436290861000,17:46:33,1436291193000,24,ON_CHANGE,135,CCC,4.00,0.00,Sensorservice Dump",`,
+				`BMP280 pressure,string,1436290809000,1436291327000,"17:40:09,1436290809000,17:48:47,1436291327000,4,CONTINUOUS,654,BB,15.00,0.00,Sensorservice Dump",`,
 			}, "\n"),
 		},
 		{
@@ -920,14 +932,14 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 Step counter,string,1436292001000,1436292420000,"18:00:01,18:07:00,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMP280 pressure,string,1436291941000,1436292420000,"17:59:01,18:07:00,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer,string,1436291671000,1436292420000,"17:54:31,18:07:00,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`RPR0521 light,string,1436291579000,1436291867000,"17:52:59,17:57:47,7,ON_CHANGE,321,AA,5.00,0.10,Sensorservice Dump",`,
-				`RPR0521 light,string,1436291403000,1436292420000,"17:50:03,18:07:00,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
-				`Window Orientation,string,1436290921000,1436292420000,"17:42:01,18:07:00,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 Step counter,string,1436290861000,1436291193000,"17:41:01,17:46:33,24,ON_CHANGE,135,CCC,4.00,0.00,Sensorservice Dump",`,
-				`BMP280 pressure,string,1436290809000,1436291327000,"17:40:09,17:48:47,4,CONTINUOUS,654,BB,15.00,0.00,Sensorservice Dump",`,
+				`BMI160 Step counter,string,1436292001000,1436292420000,"18:00:01,1436292001000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer,string,1436291671000,1436292420000,"17:54:31,1436291671000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436291579000,1436291867000,"17:52:59,1436291579000,17:57:47,1436291867000,7,ON_CHANGE,321,AA,5.00,0.10,Sensorservice Dump",`,
+				`RPR0521 light,string,1436291403000,1436292420000,"17:50:03,1436291403000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`Window Orientation,string,1436290921000,1436292420000,"17:42:01,1436290921000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,string,1436290861000,1436291193000,"17:41:01,1436290861000,17:46:33,1436291193000,24,ON_CHANGE,135,CCC,4.00,0.00,Sensorservice Dump",`,
+				`BMP280 pressure,string,1436290809000,1436291327000,"17:40:09,1436290809000,17:48:47,1436291327000,4,CONTINUOUS,654,BB,15.00,0.00,Sensorservice Dump",`,
 			}, "\n"),
 			wantSensorErrors: []error{
 				fmt.Errorf("[Invalid Activation]: connection between pkg(DD) and sensor(1) should be active"),
@@ -941,16 +953,19 @@ func TestParseSet1(t *testing.T) {
 		if !reflect.DeepEqual(OutputData.SensorInfo.AllActiveConns, test.wantActiveConn) {
 			t.Errorf("Active connection does not match: %v:\n   got: %v\n  want: %v",
 				test.name, OutputData.SensorInfo.AllActiveConns, test.wantActiveConn)
+			break
 		}
 		gotCSV := strings.TrimSpace(OutputData.CSV)
 		wantCSV := strings.TrimSpace(test.wantCSV)
 		if !reflect.DeepEqual(gotCSV, wantCSV) {
 			t.Errorf("History does not match: %v:\n  got: %v\n want: %v",
 				test.name, gotCSV, wantCSV)
+			break
 		}
 		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
 			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
 				test.name, OutputData.SensorErrs, test.wantSensorErrors)
+			break
 		}
 	}
 }
@@ -971,7 +986,7 @@ func TestParseSet2(t *testing.T) {
 			// No Sensor Errors.
 			meta: &bugreportutils.MetaInfo{
 				DeviceID:   `123456789012345678`,
-				SdkVersion: 21,
+				SdkVersion: 26,
 				Sensors: map[int32]bugreportutils.SensorInfo{
 					1: {
 						Name:        `BMI160 accelerometer`,
@@ -1112,11 +1127,11 @@ func TestParseSet2(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,1000,B,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,1000,C,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`3.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,3,CONTINUOUS,12345,C,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,1000,B,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`2.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,1000,C,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`3.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,3,CONTINUOUS,12345,C,5.00,0.10,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -1127,7 +1142,7 @@ func TestParseSet2(t *testing.T) {
 			// No Sensor Errors.
 			meta: &bugreportutils.MetaInfo{
 				DeviceID:   `123456789012345678`,
-				SdkVersion: 21,
+				SdkVersion: 26,
 				Sensors: map[int32]bugreportutils.SensorInfo{
 					1: {
 						Name:        `BMI160 accelerometer`,
@@ -1268,11 +1283,11 @@ func TestParseSet2(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,1000,B,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,1000,C,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer (accelerometer2),string,1436292420000,1436292420000,"18:07:00,18:07:00,3,CONTINUOUS,12345,C,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,1000,B,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,1000,C,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer2),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,3,CONTINUOUS,12345,C,5.00,0.10,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 		},
 		{
@@ -1283,7 +1298,7 @@ func TestParseSet2(t *testing.T) {
 			// No Sensor Errors.
 			meta: &bugreportutils.MetaInfo{
 				DeviceID:   `123456789012345678`,
-				SdkVersion: 21,
+				SdkVersion: 26,
 				Sensors: map[int32]bugreportutils.SensorInfo{
 					1: {
 						Name:        `BMI160 accelerometer`,
@@ -1476,12 +1491,12 @@ func TestParseSet2(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
-				`2.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
-				`BMI160 accelerometer (accelerometer2),string,1436292420000,1436292420000,"18:07:00,18:07:00,3,CONTINUOUS,1000,B,5.00,0.10,Sensorservice Dump,isActiveConn",`,
-				`4.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,18:07:00,4,CONTINUOUS,1000,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
-				`5.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,5,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
-				`6.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,18:07:00,6,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`2.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 accelerometer (accelerometer2),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,3,CONTINUOUS,1000,B,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+				`4.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,1000,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`5.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,5,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`6.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,6,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
 			wantSensorErrors: []error{
 				fmt.Errorf("[Active Connection]: connection(4): the sensor(4) is not active according to the sensor device section"),
@@ -1505,6 +1520,371 @@ func TestParseSet2(t *testing.T) {
 		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
 			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
 				test.name, OutputData.SensorErrs, test.wantSensorErrors)
+		}
+	}
+}
+
+func TestParseSet3(t *testing.T) {
+	meta := &bugreportutils.MetaInfo{
+		DeviceID:   `123456789012345678`,
+		SdkVersion: 29,
+		Sensors: map[int32]bugreportutils.SensorInfo{
+			1: {
+				Name:        `BMI160 accelerometer`,
+				Type:        `android.sensor.accelerometer`,
+				Number:      1,
+				Version:     1,
+				RequestMode: 0,
+				WakeUp:      false,
+				MinRateHz:   5.0,
+				MaxRateHz:   200.0,
+				Batch:       true,
+				Max:         3000,
+			},
+			7: {
+				Name:        `RPR0521 light`,
+				Type:        `android.sensor.light`,
+				Number:      7,
+				Version:     1,
+				RequestMode: 1,
+				WakeUp:      false,
+				MinRateHz:   0.1,
+				MaxRateHz:   5.0,
+				Batch:       false,
+			},
+			4: {
+				Name:        `BMP280 pressure`,
+				Type:        `android.sensor.pressure`,
+				Number:      4,
+				Version:     1,
+				RequestMode: 0,
+				WakeUp:      false,
+				MinRateHz:   1.5,
+				MaxRateHz:   25.0,
+				Batch:       true,
+				Max:         300,
+			},
+			31: {
+				Name:        `Window Orientation`,
+				Type:        `com.google.sensor.window_orientation`,
+				Number:      31,
+				Version:     1,
+				RequestMode: 1,
+				WakeUp:      true,
+				MinRateHz:   0.1,
+				MaxRateHz:   5.0,
+				Batch:       false,
+			},
+			24: {
+				Name:        `BMI160 Step counter`,
+				Type:        `android.sensor.step_counter`,
+				Number:      24,
+				Version:     1,
+				RequestMode: 1,
+				WakeUp:      false,
+				MinRateHz:   -1.0,
+				MaxRateHz:   -1.0,
+				Batch:       false,
+			},
+		},
+	}
+	tests := []struct {
+		name, finput     string
+		wantActiveConn   []*sipb.ActiveConn
+		wantDirectConn   []*sipb.DirectConn
+		wantCSV          string
+		wantSensorErrors []error
+	}{
+		{
+			name: "[Direct Connections] Test 1: " +
+				"All entries entered. Only 1 direct connection" +
+				"No sensor errors.",
+			// 1 Direct connection exists.
+			// All active sensor's information is available.
+			// No previous registration section so all of the active connections
+			// has its relevant subscription history.
+			// No Sensor Errors.
+			finput: strings.Join([]string{
+				`========================================================`,
+				`== dumpstate: 2015-07-07 18:07:00`,
+				`========================================================`,
+				``,
+				`...`,
+				`Sensor Device:`,
+				`Total 44 h/w sensors, 44 running:`,
+				`0x00000018) active-count = 1; sampling_period(ms) = {250.0}, selected = 250.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000004) active-count = 1; sampling_period(ms) = {66.7}, selected = 66.67 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000007) active-count = 1; sampling_period(ms) = {200.0}, selected = 200.00 ms; batching_period(ms) = {100.0}, selected = 100.00 ms`,
+				`0x0000001f) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000001) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`Sensor List:`,
+				`...`,
+				`5 active connections`,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Connection Number: 1 `,
+				`	Operating Mode: NORMAL`,
+				`	 com.android.server.display.AutomaticBrightnessController | WakeLockRefCount 0 | uid 1000 | cache size 0 | max cache size 0`,
+				`	 RPR0521 light 0x00000007 | status: active | pending flush events 0 `,
+				`1 direct connections`,
+				`Direct connection 0:`,
+				`	Package com.google.andriod.GoogleCamera, HAL channel handle 1, total sensor activated 1`,
+				`		Sensor 0x000029, rate 2`,
+				`Previous Registrations:`,
+			}, "\n"),
+			wantActiveConn: []*sipb.ActiveConn{
+				{
+					Number:                 1,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.google.android.gms.fitness.sensors.d.b",
+					UID:                    10013,
+					SensorNumber:           24,
+					PendingFlush:           0,
+					SamplingRateHz:         4,
+					BatchingPeriodS:        0,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 2,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.android.server.display.AutomaticBrightnessController",
+					UID:                    1000,
+					SensorNumber:           7,
+					PendingFlush:           0,
+					SamplingRateHz:         5,
+					BatchingPeriodS:        0.1,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantDirectConn: []*sipb.DirectConn{
+				{
+					Number:                 1,
+					PackageName:            "com.google.andriod.GoogleCamera",
+					HALChannelHandle:       1,
+					SensorNumber:           41,
+					RateLevel:              2,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+			}, "\n"),
+		},
+		{
+			name: "[Direct Connections] Test 2: " +
+				"All entries entered. 2 direct connections" +
+				"No sensor errors.",
+			// 2 Direct connections exist.
+			// All active sensor's information is available.
+			// No previous registration section so all of the active connections
+			// has its relevant subscription history.
+			// No Sensor Errors.
+			finput: strings.Join([]string{
+				`========================================================`,
+				`== dumpstate: 2015-07-07 18:07:00`,
+				`========================================================`,
+				``,
+				`...`,
+				`Sensor Device:`,
+				`Total 44 h/w sensors, 44 running:`,
+				`0x00000018) active-count = 1; sampling_period(ms) = {250.0}, selected = 250.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000004) active-count = 1; sampling_period(ms) = {66.7}, selected = 66.67 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000007) active-count = 1; sampling_period(ms) = {200.0}, selected = 200.00 ms; batching_period(ms) = {100.0}, selected = 100.00 ms`,
+				`0x0000001f) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000001) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`Sensor List:`,
+				`...`,
+				`5 active connections`,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Connection Number: 1 `,
+				`	Operating Mode: NORMAL`,
+				`	 com.android.server.display.AutomaticBrightnessController | WakeLockRefCount 0 | uid 1000 | cache size 0 | max cache size 0`,
+				`	 RPR0521 light 0x00000007 | status: active | pending flush events 0 `,
+				`2 direct connections`,
+				`Direct connection 0:`,
+				`	Package com.google.andriod.GoogleCamera, HAL channel handle 1, total sensor activated 1`,
+				`		Sensor 0x000029, rate 2`,
+				`Direct connection 1:`,
+				`	Package package2, HAL channel handle 1, total sensor activated 1`,
+				`		Sensor 0x000007, rate 2`,
+				`Previous Registrations:`,
+			}, "\n"),
+			wantActiveConn: []*sipb.ActiveConn{
+				{
+					Number:                 1,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.google.android.gms.fitness.sensors.d.b",
+					UID:                    10013,
+					SensorNumber:           24,
+					PendingFlush:           0,
+					SamplingRateHz:         4,
+					BatchingPeriodS:        0,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 2,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.android.server.display.AutomaticBrightnessController",
+					UID:                    1000,
+					SensorNumber:           7,
+					PendingFlush:           0,
+					SamplingRateHz:         5,
+					BatchingPeriodS:        0.1,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantDirectConn: []*sipb.DirectConn{
+				{
+					Number:                 1,
+					PackageName:            "com.google.andriod.GoogleCamera",
+					HALChannelHandle:       1,
+					SensorNumber:           41,
+					RateLevel:              2,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 2,
+					PackageName:            "package2",
+					HALChannelHandle:       1,
+					SensorNumber:           7,
+					RateLevel:              2,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+			}, "\n"),
+		},
+		{
+			name: "[Direct Connections] Test 3: " +
+				"All entries entered. " +
+				"1 direct connection with 2 activated sensor. " +
+				"No sensor errors.",
+			// 1 Direct connection exists.
+			// All active sensor's information is available.
+			// No previous registration section so all of the active connections
+			// has its relevant subscription history.
+			// No Sensor Errors.
+			finput: strings.Join([]string{
+				`========================================================`,
+				`== dumpstate: 2015-07-07 18:07:00`,
+				`========================================================`,
+				``,
+				`...`,
+				`Sensor Device:`,
+				`Total 44 h/w sensors, 44 running:`,
+				`0x00000018) active-count = 1; sampling_period(ms) = {250.0}, selected = 250.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000004) active-count = 1; sampling_period(ms) = {66.7}, selected = 66.67 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000007) active-count = 1; sampling_period(ms) = {200.0}, selected = 200.00 ms; batching_period(ms) = {100.0}, selected = 100.00 ms`,
+				`0x0000001f) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`0x00000001) active-count = 1; sampling_period(ms) = {20.0}, selected = 20.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`Sensor List:`,
+				`...`,
+				`5 active connections`,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Connection Number: 1 `,
+				`	Operating Mode: NORMAL`,
+				`	 com.android.server.display.AutomaticBrightnessController | WakeLockRefCount 0 | uid 1000 | cache size 0 | max cache size 0`,
+				`	 RPR0521 light 0x00000007 | status: active | pending flush events 0 `,
+				`1 direct connections`,
+				`Direct connection 0:`,
+				`	Package com.google.andriod.GoogleCamera, HAL channel handle 1, total sensor activated 1`,
+				`		Sensor 0x000029, rate 2`,
+				`		Sensor 0x00000007, rate 4`,
+				`Previous Registrations:`,
+			}, "\n"),
+			wantActiveConn: []*sipb.ActiveConn{
+				{
+					Number:                 1,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.google.android.gms.fitness.sensors.d.b",
+					UID:                    10013,
+					SensorNumber:           24,
+					PendingFlush:           0,
+					SamplingRateHz:         4,
+					BatchingPeriodS:        0,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 2,
+					OperatingMode:          "NORMAL",
+					PackageName:            "com.android.server.display.AutomaticBrightnessController",
+					UID:                    1000,
+					SensorNumber:           7,
+					PendingFlush:           0,
+					SamplingRateHz:         5,
+					BatchingPeriodS:        0.1,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantDirectConn: []*sipb.DirectConn{
+				{
+					Number:                 1,
+					PackageName:            "com.google.andriod.GoogleCamera",
+					HALChannelHandle:       1,
+					SensorNumber:           41,
+					RateLevel:              2,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+				{
+					Number:                 2,
+					PackageName:            "com.google.andriod.GoogleCamera",
+					HALChannelHandle:       1,
+					SensorNumber:           7,
+					RateLevel:              4,
+					HasSensorserviceRecord: false,
+					Source:                 "Sensorservice Dump",
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
+			}, "\n"),
+		},
+	}
+	for _, test := range tests {
+		OutputData := Parse(test.finput, meta)
+		if !reflect.DeepEqual(OutputData.SensorInfo.AllActiveConns, test.wantActiveConn) {
+			t.Errorf("Active connection does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.AllActiveConns, test.wantActiveConn)
+		}
+		if !reflect.DeepEqual(OutputData.SensorInfo.AllDirectConns, test.wantDirectConn) {
+			t.Errorf("Direct connection does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.AllDirectConns, test.wantDirectConn)
+		}
+		gotCSV := strings.TrimSpace(OutputData.CSV)
+		wantCSV := strings.TrimSpace(test.wantCSV)
+		if !reflect.DeepEqual(gotCSV, wantCSV) {
+			t.Errorf("History does not match: %v:\n  got: %v\n want: %v",
+				test.name, gotCSV, wantCSV)
+		}
+		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
+			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
+				test.name, OutputData.SensorErrs, test.wantSensorErrors)
+			break
 		}
 	}
 }
