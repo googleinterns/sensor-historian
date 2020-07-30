@@ -81,8 +81,7 @@ message Sensor{
 message App{
     int32 UID = 1;
     string PackageName = 2;
-    repeated SubscriptionInfo Subscriptions = 3;
-    repeated ActiveConn ActiveConns = 4;
+    repeated string SensorActivities = 3;
 }
 
 message AllSensorsInfo{
