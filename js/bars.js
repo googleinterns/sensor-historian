@@ -150,15 +150,16 @@ historian.Bars = function(context, barData, levelData, timeToDelta, state,
     }.bind(this));
 
     this.container_.find(REGEXP_FILTER_).on('input',
-        function(event) {
-          var input = $(event.target);
-          var isValid = historian.utils.isValidRegExp(
-              /** @type {string} */ (input.val()));
-          input.toggleClass('error', !isValid);
-          if (isValid) {
-            this.updateSeries_();
-          }
-        }.bind(this));
+      function(event) {
+        var input = $(event.target);
+        var isValid = historian.utils.isValidRegExp(
+            /** @type {string} */ (input.val()));
+        input.toggleClass('error', !isValid);
+        if (isValid) {
+          this.updateSeries_();
+        }
+      }
+    .bind(this));
   }
 };
 
@@ -414,6 +415,11 @@ historian.Bars.prototype.renderLabels_ = function() {
     }
     // Display each legend entry on a separate row.
     this.barData_.getLegend(group.name).forEach(function(entry) {
+      if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP && 
+        entry.isCircle) {
+        // Avoid adding legend item for errors.
+        return;
+      }
       var rectHtml = $('<div/>', {
         // We'll get build errors if class isn't in quotes, because it's
         // a reserved keyword.
@@ -424,8 +430,16 @@ historian.Bars.prototype.renderLabels_ = function() {
       }).prop('outerHTML');  // Convert the div to HTML.
       lines.push(rectHtml + entry.value);
     });
+
     if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-      lines.splice(2, 0, "Color corresponds to client count:");
+      var errorLegend = $('<div/>', {
+        'class': 'legend-item circle',
+        css: {
+          backgroundColor: 'red'
+        }
+      }).prop('outerHTML');
+      lines.splice(2, 0, errorLegend + "Error")
+      lines.splice(3, 0, "Color corresponds to client count:");
       lines.push("Pattern shows sampling rate:");
       var low = $('<div/>', {
         'class': 'legend-item lowRate',
@@ -520,9 +534,10 @@ historian.Bars.prototype.renderLabels_ = function() {
     // experience a null error if we try to use this on that browser.
     enterGroups.append('svg:foreignObject')
         .attr('x', historian.Bars.REMOVE_OFFSET_PX_)
-        .attr('y', rowHeight / 2)
+        .attr('y', (rowHeight / 2) - (historian.Bars.ROW_LABEL_HEIGHT_PX))
         .attr('font-size', '1.25em')
-        .style('line-height', 0)
+        .attr('width', 20)
+        .attr('height', 20)
         .append('xhtml:span')
         .html('&times')
         .attr('class', historian.Bars.REMOVE_METRIC_CLASS_.slice(1))
@@ -797,6 +812,9 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         // Color for sensor historian is specifically chosen.
         if (series.source == 
           historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+          if (series.type == historian.metrics.ERROR_TYPE){
+            return "red";
+          }
           var colorScale = ">=8";
           if (bar.clusteredCount < 2) {
             colorScale = "1";
@@ -819,6 +837,9 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
       var sensorPattern = function(bar) {
+        if (series.type == historian.metrics.ERROR_TYPE){
+          return "red";
+        }
         var sensor;
         historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
           // Accomodate the case where sensor number is 0, the protobuf
@@ -859,8 +880,8 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       if (series.source == 
         historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
         merged.style('fill', sensorPattern)
-          .attr('stroke', color)
-          .style('display', showBars ? 'inline' : 'none');
+        .attr('stroke', color)
+        .style('display', showBars ? 'inline' : 'none');
       } else {
         merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
         .attr('stroke', color)
@@ -961,6 +982,12 @@ historian.Bars.prototype.updateSeries_ = function() {
           (series.name in historian.metrics.appSpecificMetrics)) {
         values = this.filterServices(values, uid);
       }
+
+      var selectedAppUID = $(historian.BarData.APP_FILTER_ID_).val();
+      if (selectedAppUID != null && selectedAppUID != "") {
+        values = this.filterByAppUid_(values, selectedAppUID);
+      }
+
       allSeries.push({
         name: series.name,
         source: series.source,
@@ -1028,6 +1055,24 @@ historian.Bars.prototype.filter_ = function(data, callback) {
   return matching;
 };
 
+
+/**
+ * Returns sensor entries that involves activity for the app with the given UID.
+ * @param {!Array<(!historian.Entry|!historian.AggregatedEntry)>} data
+ *     The data to filter.
+ * @param {string} uid The app uid to match.
+ * @return {!Array<!historian.Entry|!historian.AggregatedEntry>} The matching
+ *     data.
+ * @private
+ */
+historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
+  return this.filter_(data, function(entry) {
+    var value = entry.value;
+    var valueMap = value.split(",");
+    var eventUID = valueMap[6];
+    return eventUID == uid;
+  });
+};
 
 /**
  * Returns entries that match the given regexp.
@@ -1203,7 +1248,8 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
-  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP &&
+    series.type != historian.metrics.ERROR_TYPE) {
     var sensor;
     historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
       // Accomodate the case where sensor number is 0, the protobuf
@@ -1360,6 +1406,9 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
       return this.createSortedTable_(series.name, cluster);
     default:
       if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        if (series.type == historian.metrics.ERROR_TYPE) {
+          return this.createSensorErrorTable_(cluster.getSortedValues(false));
+        }
         return this.createSensorTable_(cluster.getSortedValues(false));
       }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
@@ -1372,7 +1421,72 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
 };
 
 /**
- * Creates a table to display the sensor entries in the given cluster.
+ * Creates a table to display the sensor error entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorErrorTable_ = function(values) {
+  var headRow = [
+    'Time',
+    'UID',
+    'Package Name',
+    'Error'
+  ];
+
+  var bodyRows = values.map(function(entry) {
+    var v = entry.value.split(',');
+    var uid, packageName, errorMsg;
+    // Obtain the uid and package name from the error message, it is possible
+    // that some error message does not contain ui and package name information.
+    var commonErrorTag = ['SensorNotActive', 'Non-existingSensor', 
+      'TwoSamplingRate', 'TwoBatchingPeriod', 'InvalidActivation', 
+      'MultipleActivation', 'MultipleDe-Activation', ];
+    if (commonErrorTag.includes(v[0])) {
+        uid = v[2];
+        packageName = v[3];
+    }
+    switch(v[0]) {
+      case 'SensorNotActive':
+        errorMsg = 'This sensor has an ongoing connection to the listed ' + 
+          'uid and package name.';
+        break;
+      case 'TwoSamplingRate':
+        errorMsg = 'Two sampling rates found: ' + 
+          v[4] + 'Hz from subscription history; ' +
+          v[5] + 'Hz from active sensor section.';  
+        break;
+      case 'TwoBatchingPeriod':
+        errorMsg = 'Two batching period found: ' + 
+          v[4] + 's from subscription history; ' +
+          v[5] + 's from active sensor section.';  
+        break;
+      case 'InvalidActivation':
+        errorMsg = 'This activation should result in an active connection.';
+        break;
+      case 'MultipleActivation':
+        errorMsg = "This package with this uid has activated this sensor.";
+        break;
+      case 'MultipleDe-Activation':
+        errorMsg = "This package with this uid has de-activated this sensor.";;
+        break;
+      case 'Non-existingSensor':
+        errorMsg = 'This sensor does not exist.';
+        break;
+      default:
+        errorMsg = entry.value;
+    }
+    return [v[1], uid, packageName, errorMsg];
+  });
+
+  return {header: headRow, body: bodyRows};
+};
+
+/**
+ * Creates a table to display the sensor activity entries in the given cluster.
  *
  * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
  *     display.
