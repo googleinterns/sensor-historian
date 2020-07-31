@@ -15,7 +15,6 @@
 package sensorserviceutils
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -90,10 +89,9 @@ func TestParseSet1(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name, finput     string
-		wantActiveConn   []*sipb.ActiveConn
-		wantCSV          string
-		wantSensorErrors []error
+		name, finput   string
+		wantActiveConn []*sipb.ActiveConn
+		wantCSV        string
 	}{
 		{
 			name: "[Active Sensor and Connections] Test 1: " +
@@ -416,12 +414,10 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
+				`BMP280 pressure,error,1436292420000,1436292420000,"SensorNotActive,18:07:00,com.google.android.location.collectionlib.w,10013",`,
 				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
-			wantSensorErrors: []error{
-				fmt.Errorf("[Active Connection]: connection(2): the sensor(4) is not active according to the sensor device section"),
-			},
 		},
 		{
 			name: "[History] Test 1: " +
@@ -658,18 +654,16 @@ func TestParseSet1(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
+				`BMI160 accelerometer,error,1436292420000,1436292420000,"SensorNotActive,18:07:00,civ,10182",`,
+				`BMI160 accelerometer,error,1436292001000,1436292001000,"TwoSamplingRate,18:00:01,civ,10182,-1.00,400.00",`,
+				`BMI160 accelerometer,error,1436292001000,1436292001000,"TwoBatchingPeriod,18:00:01,civ,10182,-1.00,0.00",`,
 				`BMI160 accelerometer,string,1436292001000,1436292420000,"18:00:01,1436292001000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,400.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`BMI160 Step counter,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`RPR0521 light,error,1436290801000,1436290801000,"TwoBatchingPeriod,17:40:01,com.android.server.display.AutomaticBrightnessController,1000,0.10,0.00",`,
 				`RPR0521 light,string,1436290801000,1436292420000,"17:40:01,1436290801000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`BMP280 pressure,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`Window Orientation,string,1436290211000,1436292420000,"17:30:11,1436290211000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
-			wantSensorErrors: []error{
-				fmt.Errorf("[Active Connection]: connection(5): the sensor(1) is not active according to the sensor device section"),
-				fmt.Errorf("[Active Sensor]: active connection for pkg(civ) and sensor(1) shows two sampling rate(Hz): -1.00 at active sensor section; 400.00 at history section"),
-				fmt.Errorf("[Active Sensor]: active connection for pkg(civ) and sensor(1) shows two batching period(s): -1.00 at active sensor section; 0.00 at history section"),
-				fmt.Errorf("[Active Sensor]: active connection for pkg(com.android.server.display.AutomaticBrightnessController) and sensor(7) shows two batching period(s): 0.10 at active sensor section; 0.00 at history section"),
-			},
 		},
 		{
 			name: "[History] Test 3: " +
@@ -936,16 +930,14 @@ func TestParseSet1(t *testing.T) {
 				`BMP280 pressure,string,1436291941000,1436292420000,"17:59:01,1436291941000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,15.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`BMI160 accelerometer,string,1436291671000,1436292420000,"17:54:31,1436291671000,18:07:00,1436292420000,1,CONTINUOUS,10182,civ,50.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`RPR0521 light,string,1436291579000,1436291867000,"17:52:59,1436291579000,17:57:47,1436291867000,7,ON_CHANGE,321,AA,5.00,0.10,Sensorservice Dump",`,
+				`BMI160 accelerometer,error,1436291515000,1436291515000,"InvalidActivation,17:51:55,DD,985",`,
 				`RPR0521 light,string,1436291403000,1436292420000,"17:50:03,1436291403000,18:07:00,1436292420000,7,ON_CHANGE,1000,com.android.server.display.AutomaticBrightnessController,5.00,0.10,Sensorservice Dump,isActiveConn",`,
 				`Window Orientation,string,1436290921000,1436292420000,"17:42:01,1436290921000,18:07:00,1436292420000,31,ON_CHANGE,1000,com.android.server.policy.WindowOrientationListener,50.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,error,1436291132000,1436291132000,"MultipleDe-Activation,17:45:32,CCC,135",`,
 				`BMI160 Step counter,string,1436290861000,1436291193000,"17:41:01,1436290861000,17:46:33,1436291193000,24,ON_CHANGE,135,CCC,4.00,0.00,Sensorservice Dump",`,
 				`BMP280 pressure,string,1436290809000,1436291327000,"17:40:09,1436290809000,17:48:47,1436291327000,4,CONTINUOUS,654,BB,15.00,0.00,Sensorservice Dump",`,
+				`BMP280 pressure,error,1436291327000,1436291327000,"MultipleActivation,17:48:47,BB,654",`,
 			}, "\n"),
-			wantSensorErrors: []error{
-				fmt.Errorf("[Invalid Activation]: connection between pkg(DD) and sensor(1) should be active"),
-				fmt.Errorf("[Multiple De-Activation]: for pkg(CCC) and sensor(24)"),
-				fmt.Errorf("[Multiple Activation]: for pkg(BB) and sensor(4)"),
-			},
 		},
 	}
 	for _, test := range tests {
@@ -962,21 +954,15 @@ func TestParseSet1(t *testing.T) {
 				test.name, gotCSV, wantCSV)
 			break
 		}
-		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
-			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
-				test.name, OutputData.SensorErrs, test.wantSensorErrors)
-			break
-		}
 	}
 }
 
 func TestParseSet2(t *testing.T) {
 	tests := []struct {
-		name, finput     string
-		meta             *bugreportutils.MetaInfo
-		wantActiveConn   []*sipb.ActiveConn
-		wantCSV          string
-		wantSensorErrors []error
+		name, finput   string
+		meta           *bugreportutils.MetaInfo
+		wantActiveConn []*sipb.ActiveConn
+		wantCSV        string
 	}{
 		{
 			name: "Multiple Sensors with the same name and same type",
@@ -1491,6 +1477,9 @@ func TestParseSet2(t *testing.T) {
 			},
 			wantCSV: strings.Join([]string{
 				csv.FileHeader,
+				`4.BMI160 accelerometer (accelerometer),error,1436292420000,1436292420000,"SensorNotActive,18:07:00,C,1000",`,
+				`5.BMI160 accelerometer (accelerometer1),error,1436292420000,1436292420000,"SensorNotActive,18:07:00,C,12345",`,
+				`6.BMI160 accelerometer (accelerometer1),error,1436292420000,1436292420000,"SensorNotActive,18:07:00,C,12345",`,
 				`2.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,2,CONTINUOUS,10013,A,15.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10086,A,4.00,0.00,Sensorservice Dump,isActiveConn",`,
 				`BMI160 accelerometer (accelerometer2),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,3,CONTINUOUS,1000,B,5.00,0.10,Sensorservice Dump,isActiveConn",`,
@@ -1498,11 +1487,6 @@ func TestParseSet2(t *testing.T) {
 				`5.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,5,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
 				`6.BMI160 accelerometer (accelerometer1),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,6,CONTINUOUS,12345,C,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
 			}, "\n"),
-			wantSensorErrors: []error{
-				fmt.Errorf("[Active Connection]: connection(4): the sensor(4) is not active according to the sensor device section"),
-				fmt.Errorf("[Active Connection]: connection(5): the sensor(5) is not active according to the sensor device section"),
-				fmt.Errorf("[Active Connection]: connection(6): the sensor(6) is not active according to the sensor device section"),
-			},
 		},
 	}
 	for _, test := range tests {
@@ -1516,10 +1500,6 @@ func TestParseSet2(t *testing.T) {
 		if !reflect.DeepEqual(gotCSV, wantCSV) {
 			t.Errorf("History does not match: %v:\n  got: %v\n want: %v",
 				test.name, gotCSV, wantCSV)
-		}
-		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
-			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
-				test.name, OutputData.SensorErrs, test.wantSensorErrors)
 		}
 	}
 }
@@ -1589,11 +1569,10 @@ func TestParseSet3(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name, finput     string
-		wantActiveConn   []*sipb.ActiveConn
-		wantDirectConn   []*sipb.DirectConn
-		wantCSV          string
-		wantSensorErrors []error
+		name, finput   string
+		wantActiveConn []*sipb.ActiveConn
+		wantDirectConn []*sipb.DirectConn
+		wantCSV        string
 	}{
 		{
 			name: "[Direct Connections] Test 1: " +
@@ -1880,11 +1859,6 @@ func TestParseSet3(t *testing.T) {
 		if !reflect.DeepEqual(gotCSV, wantCSV) {
 			t.Errorf("History does not match: %v:\n  got: %v\n want: %v",
 				test.name, gotCSV, wantCSV)
-		}
-		if !reflect.DeepEqual(OutputData.SensorErrs, test.wantSensorErrors) {
-			t.Errorf("SensorErrors: %v:\n  got errs: %v\n want errs: %v",
-				test.name, OutputData.SensorErrs, test.wantSensorErrors)
-			break
 		}
 	}
 }
