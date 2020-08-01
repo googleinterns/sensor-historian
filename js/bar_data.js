@@ -377,8 +377,9 @@ historian.BarData.METRICS_SELECTOR_ = 'select.configure-metrics';
 historian.BarData.APP_FILTER_ID_ = '#filter-by-app';
 
 /**
- * Set up the app filter selector. With a selected app, the graph only display
- * sensor information for those have subscription activities with the chosen app.
+ * Sets up the app filter selector. With a selected app, the graph only display
+ * sensor information for those sensors that have subscription activities 
+ * with the chosen app.
  * @param {!Object<boolean>} hidden Groups hidden.
  * @private
  */
