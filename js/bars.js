@@ -819,18 +819,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
       var sensorPattern = function(bar) {
-        var sensor;
-        historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
-          // Accomodate the case where sensor number is 0, the protobuf
-          // message does not have the field for Number
-          if (bar.sensorNum == 0) {
-            if (!sensorObj.Number) {
-              sensor = sensorObj;
-            }
-          } else if (sensorObj.Number == bar.sensorNum) {
-            sensor = sensorObj;
-          }
-        });
+        var sensor = getSensorByNumber(bar.sensorNum);
 
         var color = 'red';
         if (bar.clusteredCount < 2) {
@@ -1204,18 +1193,7 @@ historian.Bars.prototype.tooltipText_ = function(
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
   if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-    var sensor;
-    historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
-      // Accomodate the case where sensor number is 0, the protobuf
-      // message does not have the field for Number
-      if (cluster.sensorNum == 0) {
-        if (!sensorObj.Number) {
-          sensor = sensorObj;
-        }
-      } else if (sensorObj.Number == cluster.sensorNum) {
-        sensor = sensorObj;
-      }
-    });
+    var sensor = getSensorByNumber(cluster.sensorNum);
     // Show the sampling rate information in the floating window.
     var level = 'Low';
     if (sensor.RequestMode != 2) {
@@ -1940,5 +1918,26 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
     return this.getRowY(idx + .7);
   }
 };
+
+/**
+ * Given the number for the sensor we need, return the sensor object.
+ * @param {number} number The number for the sensor that we want.
+ * @return {object} 
+ */
+getSensorByNumber = function(number){
+  var sensor;
+  historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+    // Accomodate the case where the protobuf message does not have the field 
+    // for number if the value stored is 0.
+    if (number == 0) {
+      if (!sensorObj.Number) {
+        sensor = sensorObj;
+      }
+    } else if (sensorObj.Number == number) {
+      sensor = sensorObj;
+    }
+  });
+  return sensor
+}
 
 });  // goog.scope
