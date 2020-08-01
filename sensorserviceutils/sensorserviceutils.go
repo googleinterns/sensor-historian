@@ -173,9 +173,11 @@ type parser struct {
 	parsingErrs []error
 	sensorErrs  []error
 
-	// apps is a map from UID to a sensorcheck map.
-	// The sensorcheck map is a map from Sensor number to a boolean value.
-	// If app with UID = 100 uses sensor 3, then p.apps[100][3] = true
+	// apps is a map from uid to another map that indicates whether this app
+	// has a subscription event related to the sensor.
+	// For example, if the inner map for UID=100 maps SensorNumber 3 to true,
+	// (p.apps[100][3] = true), then the app with UID 100 has subscribed
+	// sensor number 3 in the history.
 	apps map[int32]map[int32]bool
 
 	// sensors is a map from sensor number to the relevant sensor's information.
@@ -466,7 +468,6 @@ func (slice int32Slice) Swap(i, j int) {
 // sensorservice dump section. The output contains information for all active
 // connections, all sensors' activities grouped by sensors, and all sensors'
 // activities grouped by applications.
-// TODO: organized the sensors' activities data by applications.s
 func (p parser) allSensorInfo() *sipb.AllSensorsInfo {
 	allActiveConns := make(activeConns, 0, len(p.activeConns))
 	for _, conn := range p.activeConns {
