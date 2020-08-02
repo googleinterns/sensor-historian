@@ -158,8 +158,7 @@ historian.Bars = function(context, barData, levelData, timeToDelta, state,
         if (isValid) {
           this.updateSeries_();
         }
-      }
-    .bind(this));
+      }.bind(this));
   }
 };
 
