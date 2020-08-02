@@ -797,14 +797,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         // Color for sensor historian is specifically chosen.
         if (series.source == 
           historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-          var colorScale = ">=8";
-          if (bar.clusteredCount < 2) {
-            colorScale = "1";
-          } else if (bar.clusteredCount < 5) {
-            colorScale = "2-4";
-          } else if (bar.clusteredCount < 7) {
-            colorScale = "5-7";
-          }
+          var colorScale = getColorScale(bar.clusteredCount);
           var baseColor = series.color(colorScale);
           return baseColor;
         }
@@ -820,16 +813,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
 
       var sensorPattern = function(bar) {
         var sensor = getSensorByNumber(bar.sensorNum);
-
-        var color = 'red';
-        if (bar.clusteredCount < 2) {
-          color = 'green';
-        } else if (bar.clusteredCount < 5) {
-          color = 'yellow';
-        } else if (bar.clusteredCount < 7) {
-          color = 'blue';
-        }
-            
+        var color = getColorScale(bar.clusteredCount);            
         var samplingRate = 'low';
         // For one-shot sensor, samplingRate is set to be medium, otherwise
         // set the samplingRate variable based on the max sampling rate occurs
@@ -1920,11 +1904,11 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
 };
 
 /**
- * Given the number for the sensor we need, return the sensor object.
+ * Returns the sensor object corresponding to the given sensor number.
  * @param {number} number The number for the sensor that we want.
  * @return {object} 
  */
-getSensorByNumber = function(number){
+getSensorByNumber = function(number) {
   var sensor;
   historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
     // Accomodate the case where the protobuf message does not have the field 
@@ -1937,7 +1921,24 @@ getSensorByNumber = function(number){
       sensor = sensorObj;
     }
   });
-  return sensor
-}
+  return sensor;
+};
+
+/**
+ * Returns the color scale corresponding to the given client count number.
+ * @param {number} number The number for client count.
+ * @return {object} 
+ */
+getColorScale = function(number) {
+  var colorScale = ">=8";
+  if (number < 2) {
+    colorScale = "1";
+  } else if (number < 5) {
+    colorScale = "2-4";
+  } else if (number < 7) {
+    colorScale = "5-7";
+  }
+  return colorScale;
+};
 
 });  // goog.scope
