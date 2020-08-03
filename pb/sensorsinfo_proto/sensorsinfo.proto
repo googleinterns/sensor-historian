@@ -37,8 +37,8 @@ message ActiveConn{
     int32 SensorNumber = 3;
     int32 Number = 4;
     int32 PendingFlush = 5;
-    double SamplingRateHz = 6;
-    double BatchingPeriodS = 7;
+    double RequestedSamplingRateHz = 6;
+    double RequestedBatchingPeriodS = 7;
     bool HasSensorserviceRecord = 8;
     string OperatingMode = 9;
     string Source = 10;
@@ -76,13 +76,15 @@ message Sensor{
     int32 Reserved = 9;
     bool Batch = 10;
     bool WakeUp = 11;
+    bool isActive = 12;
+    double runningSamplingRateHz = 13;
+    double runningBatchingPeriodS = 14;
 }
 
 message App{
     int32 UID = 1;
     string PackageName = 2;
-    repeated SubscriptionInfo Subscriptions = 3;
-    repeated ActiveConn ActiveConns = 4;
+    repeated string SensorActivities = 3;
 }
 
 message AllSensorsInfo{
