@@ -193,7 +193,7 @@ type parser struct {
 	// information.
 	directConns map[string]*sipb.DirectConn
 
-	// history is a map from an identifier to an sensor subscription event.
+	// history is a map from an identifier to a sensor subscription event.
 	// Note that the identifier is a string formed by concatenating
 	// sensor number and name of the package that subscribes the sensor.
 	history map[string]*sipb.SubscriptionInfo
@@ -826,6 +826,15 @@ func (p *parser) createTimestampMs(line string, result map[string]string) (int64
 	if p.earliestTimestampMs > timestampMs {
 		p.earliestTimestampMs = timestampMs
 	}
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+	if referenceTimestampMs < timestampMs {
+		p.referenceTime = result["time"]
+		if hasDate {
+			p.referenceMonth, _ = strconv.Atoi(date["month"])
+			p.referenceDay, _ = strconv.Atoi(date["day"])
+		}
+	}
 	return timestampMs, p.parsingErrs
 }
 
@@ -879,8 +888,7 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 				referenceTimestampMs, value, "")
 		} else {
 			value := fmt.Sprintf("InvalidActivation,%s,%s,%d",
-				msToTime(timestampMs).In(p.loc).Format(timeFormat),
-				packageName, uid)
+				start, packageName, uid)
 			p.csvState.PrintInstantEvent(csv.Entry{
 				Desc:  p.sensors[sensorNumber].GetName(),
 				Start: timestampMs,
@@ -896,11 +904,10 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 			// has paired up with an activation statement. The current
 			// activation statement is an extra one.
 			value := fmt.Sprintf("MultipleActivation,%s,%s,%d",
-				msToTime(eventInfo.GetEndMs()).In(p.loc).Format(timeFormat),
-				packageName, uid)
+				start, packageName, uid)
 			p.csvState.PrintInstantEvent(csv.Entry{
 				Desc:  p.sensors[sensorNumber].GetName(),
-				Start: eventInfo.GetEndMs(),
+				Start: timestampMs,
 				Type:  typeError,
 				Value: value,
 			})
@@ -918,7 +925,6 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 				samplingRateHz, batchingPeriodS, sensorDump)
 			p.csvState.Print(sensorName, "string", timestampMs, eventInfo.EndMs,
 				value, "")
-			delete(p.history, identifier)
 		}
 	}
 
