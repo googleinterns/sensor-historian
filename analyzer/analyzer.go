@@ -1026,7 +1026,7 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 	return nil
 }
 
-// constructAppName takes in a list of all app information and update the app
+// constructAppName takes in a list of all app information and updates the app
 // name in the output produced after parsing sensorservice dump.
 func constructAppName(output sensorserviceutils.OutputData,
 	appStats []presenter.AppStat) sensorserviceutils.OutputData {
@@ -1040,7 +1040,7 @@ func constructAppName(output sensorserviceutils.OutputData,
 	return output
 }
 
-// analyze takes in the bugreport and information for all packages and produce
+// analyze takes in the bugreport and information for all packages and produces
 // summary data for battery usage activity found in the bugreport.
 func analyze(bugReport string, pkgs []*usagepb.PackageInfo) summariesData {
 	upm, errs := parseutils.UIDAndPackageNameMapping(bugReport, pkgs)
