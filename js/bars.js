@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -150,15 +150,15 @@ historian.Bars = function(context, barData, levelData, timeToDelta, state,
     }.bind(this));
 
     this.container_.find(REGEXP_FILTER_).on('input',
-        function(event) {
-          var input = $(event.target);
-          var isValid = historian.utils.isValidRegExp(
-              /** @type {string} */ (input.val()));
-          input.toggleClass('error', !isValid);
-          if (isValid) {
-            this.updateSeries_();
-          }
-        }.bind(this));
+      function(event) {
+        var input = $(event.target);
+        var isValid = historian.utils.isValidRegExp(
+            /** @type {string} */ (input.val()));
+        input.toggleClass('error', !isValid);
+        if (isValid) {
+          this.updateSeries_();
+        }
+      }.bind(this));
   }
 };
 
@@ -414,6 +414,11 @@ historian.Bars.prototype.renderLabels_ = function() {
     }
     // Display each legend entry on a separate row.
     this.barData_.getLegend(group.name).forEach(function(entry) {
+      if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP && 
+        entry.isCircle) {
+        // Avoid adding legend item for errors repeatedly.
+        return;
+      }
       var rectHtml = $('<div/>', {
         // We'll get build errors if class isn't in quotes, because it's
         // a reserved keyword.
@@ -424,6 +429,34 @@ historian.Bars.prototype.renderLabels_ = function() {
       }).prop('outerHTML');  // Convert the div to HTML.
       lines.push(rectHtml + entry.value);
     });
+
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+      var errorLegend = $('<div/>', {
+        'class': 'legend-item circle',
+        css: {
+          backgroundColor: 'red'
+        }
+      }).prop('outerHTML');
+      lines.splice(2, 0, errorLegend + "Error")
+      // If the series only has error messages, then all the legends for 
+      // regular subscription events will not be shown.
+      if (lines.length > 3) {
+        lines.splice(3, 0, "Color corresponds to client count:");
+        lines.push("Pattern shows sampling rate:");
+        var low = $('<div/>', {
+          'class': 'legend-item lowRate',
+        }).prop('outerHTML');
+        lines.push(low + "Low");
+        var medium = $('<div/>', {
+          'class': 'legend-item mediumRate',
+        }).prop('outerHTML');
+        lines.push(medium + "Medium");
+        var high = $('<div/>', {
+          'class': 'legend-item highRate',
+        }).prop('outerHTML');
+        lines.push(high + "High");
+      }
+    }
     this.legendTooltip_ =
         new historian.Tooltip(lines, this.state_, 'help-tooltip');
   }.bind(this);
@@ -504,9 +537,10 @@ historian.Bars.prototype.renderLabels_ = function() {
     // experience a null error if we try to use this on that browser.
     enterGroups.append('svg:foreignObject')
         .attr('x', historian.Bars.REMOVE_OFFSET_PX_)
-        .attr('y', rowHeight / 2)
+        .attr('y', (rowHeight / 2) - (historian.Bars.ROW_LABEL_HEIGHT_PX))
         .attr('font-size', '1.25em')
-        .style('line-height', 0)
+        .attr('width', 20)
+        .attr('height', 20)
         .append('xhtml:span')
         .html('&times')
         .attr('class', historian.Bars.REMOVE_METRIC_CLASS_.slice(1))
@@ -778,6 +812,16 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             }
             return series.color(eventType);
         }
+        // Color for sensor historian is specifically chosen.
+        if (series.source == 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+          if (series.type == historian.metrics.ERROR_TYPE) {
+            return "red";
+          }
+          var colorScale = getColorScale(bar.clusteredCount);
+          var baseColor = series.color(colorScale);
+          return baseColor;
+        }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
           return series.color(bar.clusteredCount);
@@ -787,10 +831,39 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var showBars = this.container_.find(SHOW_BARS_TOGGLE_).is(':checked');
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
+      
+      var sensorPattern = function(bar) {
+        if (series.type == historian.metrics.ERROR_TYPE) {
+          return "red";
+        }
+        var sensor = getSensorByNumber(bar.sensorNum);
+        var color = getColorScale(bar.clusteredCount);            
+        var samplingRate = 'low';
+        // The bar is filled with solid color is we are looking at a one-shot
+        // sensor or the maxRate == -1 (meaning that sampling period = 0s).
+        if (sensor.RequestMode == 2 || bar.maxRate == -1) {
+          samplingRate = 'high';
+        // Otherwise, set the samplingRate variable based on the max sampling 
+        // rate occurs in the bar.
+        } else if (bar.maxRate > 0.6 * sensor.MaxRateHz) {
+          samplingRate = 'high';
+        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
+          samplingRate = 'medium';
+        }
+        var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
+        return fill;
+      }
 
-      merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
-          .attr('stroke', color)
-          .style('display', showBars ? 'inline' : 'none');
+      if (series.source == 
+        historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        merged.style('fill', sensorPattern)
+        .attr('stroke', color)
+        .style('display', showBars ? 'inline' : 'none');
+      } else {
+        merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
+        .attr('stroke', color)
+        .style('display', showBars ? 'inline' : 'none');
+      }
       bars.exit().remove();
     }.bind(this));
   }.bind(this));
@@ -886,6 +959,14 @@ historian.Bars.prototype.updateSeries_ = function() {
           (series.name in historian.metrics.appSpecificMetrics)) {
         values = this.filterServices(values, uid);
       }
+
+      // Once the app filter selects an app, update the values for all series
+      // to only include events related to the chosen app.
+      var selectedAppUID = $(historian.BarData.APP_FILTER_ID_).val();
+      if (selectedAppUID != null && selectedAppUID != "") {
+        values = this.filterByAppUid_(values, selectedAppUID);
+      }
+
       allSeries.push({
         name: series.name,
         source: series.source,
@@ -953,6 +1034,43 @@ historian.Bars.prototype.filter_ = function(data, callback) {
   return matching;
 };
 
+
+/**
+ * Returns sensor entries that have activities for the app with the given UID.
+ * @param {!Array<(!historian.Entry|!historian.AggregatedEntry)>} data
+ *     The data to filter.
+ * @param {string} uid The app uid to match.
+ * @return {!Array<!historian.Entry|!historian.AggregatedEntry>} The matching
+ *     data.
+ * @private
+ */
+historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
+  return this.filter_(data, function(entry) {
+    // Only keep the entries that corresponds to the given uid.
+    var valueMap = entry.value.split(",");
+    var eventUID;
+    switch(valueMap[0]) {
+      // For error entry, the value field starts with an error tag, so we
+      // case on the error tag to get the uid.
+      case 'SensorNotActive':
+      case 'InvalidActivation':
+      case 'MultipleActivation':
+      case 'MultipleDe-Activation':
+        eventUID = valueMap[3];
+        break
+      case 'Non-existingSensor':
+        // This error will not corresponds to any app since the app uid will 
+        // not be parsed for subscription event with an non-existing sensor.
+        break
+      default :
+        // For regular sensor subscription event, uid is recorded as the 
+        // 6th value.
+        eventUID = valueMap[6];
+        break
+    }
+    return eventUID == uid;
+  });
+};
 
 /**
  * Returns entries that match the given regexp.
@@ -1128,6 +1246,36 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+    if (series.type != historian.metrics.ERROR_TYPE) {
+      var sensor = getSensorByNumber(cluster.sensorNum);
+      var mode = (!sensor.RequestMode) ? 0 : sensor.RequestMode;
+      var requestModeStr = historian.metrics.RequestMode[mode];
+      formattedLines[0] = this.bold_(name + " (" + requestModeStr+ ")", toHtml);
+      // Show the sampling rate information in the floating window.
+      var level = 'Low';
+      // For one-shot sensor, no sampling information will be shown.
+      if (requestModeStr != "One-shot") {
+        // maxRate = -1 means that sampling period is 0. Therefore sampling rate
+        // quantity is not applicable. No sampling information will be shown.
+        // Otherwise, sampling information and the corresponding intensity level
+        // will be shown.
+        if (sensor.MaxRateHz != -1) {
+          if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
+            level = 'High';
+          } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
+            level = 'Medium';
+          }
+          formattedLines.push('Max Sampling Rate in the interval: ' + 
+            cluster.maxRate + 'Hz (' + level + ')');
+          formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
+            sensor.MaxRateHz + 'Hz');
+        } else {
+          formattedLines.push('Max Delay is 0 second.')
+        }
+      }
+    }
+  }
 
   if (series.name == historian.metrics.Csv.CPU_RUNNING) {
     var powerEvents = cluster.sorted
@@ -1257,6 +1405,12 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     case historian.metrics.Csv.STRICT_MODE_VIOLATION:
       return this.createSortedTable_(series.name, cluster);
     default:
+      if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        if (series.type == historian.metrics.ERROR_TYPE) {
+          return this.createSensorErrorTable_(cluster.getSortedValues(false));
+        }
+        return this.createSensorTable_(cluster.getSortedValues(false));
+      }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1264,6 +1418,178 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
           series, cluster.getSortedValues(
           series.name == historian.metrics.KERNEL_UPTIME), cluster);
   }
+};
+
+/**
+ * Creates a table to display the sensor error entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorErrorTable_ = function(values) {
+  var headRow = [
+    'Time',
+    'UID',
+    'Package Name',
+    'Error'
+  ];
+
+  var bodyRows = [];
+  values.forEach(function(entry) {
+    var v = entry.value.split(',');
+    var uid, packageName, errorMsg;
+    // Obtain the uid and package name from the error message, it is possible
+    // that some error message does not contain uid or package name information.
+    var commonErrorTag = ['SensorNotActive', 'Non-existingSensor', 
+      'InvalidActivation', 'MultipleActivation', 'MultipleDe-Activation', ];
+    if (commonErrorTag.includes(v[0])) {
+      packageName = v[2];
+      uid = v[3];
+    }
+    switch(v[0]) {
+      case 'SensorNotActive':
+        errorMsg = 'This sensor has an ongoing connection to the listed ' + 
+          'uid and package name.';
+        break;
+      case 'InvalidActivation':
+        errorMsg = 'This activation should result in an active connection.';
+        break;
+      case 'MultipleActivation':
+        errorMsg = "This package with this uid has activated this sensor.";
+        break;
+      case 'MultipleDe-Activation':
+        errorMsg = "This package with this uid has de-activated this sensor.";;
+        break;
+      case 'Non-existingSensor':
+        errorMsg = 'This sensor does not exist.';
+        break;
+      default:
+        errorMsg = entry.value;
+    }
+    var singleRow = [v[1], uid, packageName, errorMsg];
+    // It is possible that multiple events with the same values are created, 
+    // then the entry.count field will record the number of events having this
+    // entry value. We want to show all events even though the values 
+    // are repeated.
+    for (var i = 0; i < entry.count; i++) {
+      bodyRows.push(singleRow);
+    }
+  });
+
+  return {header: headRow, body: bodyRows};
+};
+
+/**
+ * Creates a table to display the sensor activity entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorTable_ = function(values) {
+  var headRow = [
+    'Start',
+    'End',
+    'UID',
+    'Package Name',
+  ];
+  if (!values[0].value.includes("ONE_SHOT")) {
+    headRow.push('Requested\nSampling Rate (Hz)');
+    headRow.push('Requested\nBatching Period (s)');
+  }
+  headRow.push('Total Duration');
+
+  var highlightActiveConn = [];
+  var bodyRows = [];
+  values.forEach(function(entry, index) {
+    var v = entry.value.split(',');
+    var startMs = parseInt(v[1],10);
+    var startTime = v[0];
+    var endMs = parseInt(v[3],10);
+    var endTime = v[2];
+    var durationOutput = historian.time.formatDuration(endMs - startMs);
+
+    // Batching Period = -1 is a default value set for active connections 
+    // without a history.
+    var batching = v[9];
+    if (v[9] == "-1.00") {
+      batching = "Unavailable";
+    }
+
+    var samplingRate = v[8]
+    if (samplingRate == "-1.00") {
+      samplingRate = "Sampling Period\nis 0 second";
+    }
+
+    var isActive = false;
+    if (v[v.length - 1] == "isActiveConn") {
+      highlightActiveConn.push(index);
+      isActive = true;
+      endTime = "Running";
+      durationOutput = "Active Connection";
+      // For active connection, we also show the actual sampling rate and 
+      // batching period information if available.
+      if (headRow.length == 7) {
+        headRow.push('Actual Sampling\nRate (Hz)');
+        headRow.push('Actual Batching\nPeriod (s)');
+      }
+      var sensorNum = v[4];
+      var sensorObj = getSensorByNumber(sensorNum);
+      var actualSamplingRate = sensorObj.runningSamplingRateHz;
+      var actualBatchingPeriod = sensorObj.runningBatchingPeriodS;
+      if (!actualBatchingPeriod) {
+        actualBatchingPeriod = "Not batching";
+      }
+      if (actualSamplingRate == "-1.00") {
+        actualSamplingRate = "(Not Applicalbe)\nSampling Period\nis 0 second";
+      }
+    }
+
+    // Do not show the start time and duration for subscription event with
+    // no activation statement. Also the requested sampling rate and batching
+    // period information will be missing.
+    if (v[v.length - 1] == "NoActivation") {
+      startTime = "Unknown";
+      durationOutput = "No activation\nfound in history";
+      samplingRate = "Unavailable";
+      batching = "Unavailable";
+    }
+
+    var singleRow;
+
+    if (headRow.length == 5) {
+      singleRow = [startTime, endTime, v[6], v[7], durationOutput];
+    } else if (isActive) {
+      singleRow = [startTime, endTime, v[6], v[7], samplingRate, batching, 
+        durationOutput,actualSamplingRate, actualBatchingPeriod];
+    } else {
+      singleRow = [startTime, endTime, v[6], v[7], samplingRate, batching, 
+        durationOutput];
+    }
+    // It is possible that multiple events with the same values are created, 
+    // then the entry.count field will record the number of events having this
+    // entry value.We want to show all events even though the values 
+    // are repeated.
+    for (var i = 0; i < entry.count; i++) {
+      bodyRows.push(singleRow);
+    }
+  });
+
+  highlightActiveConn.forEach(function(row) {
+    bodyRows[row].forEach(function(value, col) {
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'highlighted-cell'
+      };
+    });
+  });
+
+  return {header: headRow, body: bodyRows};
 };
 
 
@@ -1774,6 +2100,44 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
   } else {
     return this.getRowY(idx + .7);
   }
+};
+
+/**
+ * Returns the sensor object corresponding to the given sensor number.
+ * @param {number} number The number for the sensor that we want.
+ * @return {object} 
+ */
+getSensorByNumber = function(number) {
+  var sensor;
+  historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+    // Accomodate the case where the protobuf message does not have the field 
+    // for number if the value stored is 0.
+    if (number == 0) {
+      if (!sensorObj.Number) {
+        sensor = sensorObj;
+      }
+    } else if (sensorObj.Number == number) {
+      sensor = sensorObj;
+    }
+  });
+  return sensor;
+};
+
+/**
+ * Returns the color scale corresponding to the given client count number.
+ * @param {number} number The number for client count.
+ * @return {object} 
+ */
+getColorScale = function(number) {
+  var colorScale = ">=8";
+  if (number < 2) {
+    colorScale = "1";
+  } else if (number < 5) {
+    colorScale = "2-4";
+  } else if (number < 7) {
+    colorScale = "5-7";
+  }
+  return colorScale;
 };
 
 });  // goog.scope
