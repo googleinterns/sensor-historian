@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -424,6 +424,22 @@ historian.Bars.prototype.renderLabels_ = function() {
       }).prop('outerHTML');  // Convert the div to HTML.
       lines.push(rectHtml + entry.value);
     });
+    if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+      lines.splice(2, 0, "Color corresponds to client count:");
+      lines.push("Pattern shows sampling rate:");
+      var low = $('<div/>', {
+        'class': 'legend-item lowRate',
+      }).prop('outerHTML');
+      lines.push(low + "Low");
+      var medium = $('<div/>', {
+        'class': 'legend-item mediumRate',
+      }).prop('outerHTML');
+      lines.push(medium + "Medium");
+      var high = $('<div/>', {
+        'class': 'legend-item highRate',
+      }).prop('outerHTML');
+      lines.push(high + "High");
+    }
     this.legendTooltip_ =
         new historian.Tooltip(lines, this.state_, 'help-tooltip');
   }.bind(this);
@@ -778,6 +794,13 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             }
             return series.color(eventType);
         }
+        // Color for sensor historian is specifically chosen.
+        if (series.source == 
+          historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+          var colorScale = getColorScale(bar.clusteredCount);
+          var baseColor = series.color(colorScale);
+          return baseColor;
+        }
         // Use count to determine color for aggregated stats.
         if (historian.metrics.isAggregatedMetric(series.name)) {
           return series.color(bar.clusteredCount);
@@ -788,9 +811,34 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
-      merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
+      var sensorPattern = function(bar) {
+        var sensor = getSensorByNumber(bar.sensorNum);
+        var color = getColorScale(bar.clusteredCount);            
+        var samplingRate = 'low';
+        // For one-shot sensor, samplingRate is set to be medium, otherwise
+        // set the samplingRate variable based on the max sampling rate occurs
+        // in the bar.
+        if (sensor.RequestMode == 2) {
+          samplingRate = 'medium';
+        } else if (bar.maxRate > 0.6 * sensor.MaxRateHz) {
+          samplingRate = 'high';
+        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
+          samplingRate = 'medium';
+        }
+        var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
+        return fill;
+      }
+
+      if (series.source == 
+        historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        merged.style('fill', sensorPattern)
           .attr('stroke', color)
           .style('display', showBars ? 'inline' : 'none');
+      } else {
+        merged.style('fill', isUnavailable ? 'url(' + hatchPattern + ')' : color)
+        .attr('stroke', color)
+        .style('display', showBars ? 'inline' : 'none');
+      }
       bars.exit().remove();
     }.bind(this));
   }.bind(this));
@@ -1128,6 +1176,22 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+    var sensor = getSensorByNumber(cluster.sensorNum);
+    // Show the sampling rate information in the floating window.
+    var level = 'Low';
+    if (sensor.RequestMode != 2) {
+      if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
+        level = 'High';
+      } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
+        level = 'Medium';
+      }
+      formattedLines.push('Max Sampling Rate in the interval: ' + 
+        cluster.maxRate + 'Hz (' + level + ')');
+      formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
+        sensor.MaxRateHz + 'Hz');
+    }
+  }
 
   if (series.name == historian.metrics.Csv.CPU_RUNNING) {
     var powerEvents = cluster.sorted
@@ -1257,6 +1321,9 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
     case historian.metrics.Csv.STRICT_MODE_VIOLATION:
       return this.createSortedTable_(series.name, cluster);
     default:
+      if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        return this.createSensorTable_(cluster.getSortedValues(false));
+      }
       if (series.source == historian.historianV2Logs.Sources.EVENT_LOG) {
         return this.createSortedTable_(series.name, cluster);
       }
@@ -1264,6 +1331,66 @@ historian.Bars.prototype.getTable_ = function(series, cluster) {
           series, cluster.getSortedValues(
           series.name == historian.metrics.KERNEL_UPTIME), cluster);
   }
+};
+
+/**
+ * Creates a table to display the sensor entries in the given cluster.
+ *
+ * @param {!Array<!historian.data.ClusterEntryValue>} values The values to
+ *     display.
+ * @return {?{header: ?historian.TableRow, body: !Array<!historian.TableRow>}}
+ *     The table header and body.
+ * @private
+ */
+historian.Bars.prototype.createSensorTable_ = function(values) {
+  var headRow = [
+    'Start',
+    'End',
+    'UID',
+    'Package Name',
+  ];
+  if (!values[0].value.includes("ONE_SHOT")) {
+    headRow.push('Sampling Rate(Hz)');
+    headRow.push('Batching Period(s)');
+  }
+  headRow.push('Source');
+  headRow.push('Total Duration');
+
+  var highlightActiveConn = [];
+  var bodyRows = values.map(function(entry, index) {
+    var v = entry.value.split(',');
+    var startMs = parseInt(v[1],10);
+    var endMs = parseInt(v[3],10);
+    var durationOutput = historian.time.formatDuration(endMs - startMs);
+
+    // Highlight the row related to active connection.
+    if (v[v.length - 1] == "isActiveConn") {
+      highlightActiveConn.push(index);
+    }
+    // Batching Period = -1 is a default value set for active connections 
+    // without a history.
+    var batching = (v[9] == "-1.00") || (v[9] == "0.00")? "Not batching" : v[9];
+
+    var samplingRate = v[8]
+    if ((v[5].includes("ON_CHANGE")) && samplingRate == "-1.00") {
+      samplingRate = "on-change"
+    }
+
+    return headRow.length > 6 ? 
+    [v[0], v[2], v[6], v[7], samplingRate, batching, v[10], durationOutput] :
+    [v[0], v[2], v[6], v[7], v[10], durationOutput];
+  });
+
+  highlightActiveConn.forEach(function(row) {
+    bodyRows[row].forEach(function(value, col) {
+      bodyRows[row][col] = {
+        value: value,
+        classes: 'highlighted-cell'
+      };
+    });
+  });
+
+  return {header: headRow, body: bodyRows};
 };
 
 
@@ -1774,6 +1901,44 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
   } else {
     return this.getRowY(idx + .7);
   }
+};
+
+/**
+ * Returns the sensor object corresponding to the given sensor number.
+ * @param {number} number The number for the sensor that we want.
+ * @return {object} 
+ */
+getSensorByNumber = function(number) {
+  var sensor;
+  historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+    // Accomodate the case where the protobuf message does not have the field 
+    // for number if the value stored is 0.
+    if (number == 0) {
+      if (!sensorObj.Number) {
+        sensor = sensorObj;
+      }
+    } else if (sensorObj.Number == number) {
+      sensor = sensorObj;
+    }
+  });
+  return sensor;
+};
+
+/**
+ * Returns the color scale corresponding to the given client count number.
+ * @param {number} number The number for client count.
+ * @return {object} 
+ */
+getColorScale = function(number) {
+  var colorScale = ">=8";
+  if (number < 2) {
+    colorScale = "1";
+  } else if (number < 5) {
+    colorScale = "2-4";
+  } else if (number < 7) {
+    colorScale = "5-7";
+  }
+  return colorScale;
 };
 
 });  // goog.scope
