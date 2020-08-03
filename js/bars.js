@@ -814,17 +814,8 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var sensorPattern = function(bar) {
         var sensor = getSensorByNumber(bar.sensorNum);
         var color = getColorScale(bar.clusteredCount);            
-        var samplingRate = 'low';
-        // For one-shot sensor, samplingRate is set to be medium, otherwise
-        // set the samplingRate variable based on the max sampling rate occurs
-        // in the bar.
-        if (sensor.RequestMode == 2) {
-          samplingRate = 'medium';
-        } else if (bar.maxRate > 0.6 * sensor.MaxRateHz) {
-          samplingRate = 'high';
-        } else if (bar.maxRate > 0.3 * sensor.MaxRateHz) {
-          samplingRate = 'medium';
-        }
+        var samplingRate = getSamplingRateIntensity(sensor.RequestMode, 
+          sensor.MaxRateHz, bar.MaxRate)
         var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
         return fill;
       }
@@ -1179,13 +1170,9 @@ historian.Bars.prototype.tooltipText_ = function(
   if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
     var sensor = getSensorByNumber(cluster.sensorNum);
     // Show the sampling rate information in the floating window.
-    var level = 'Low';
     if (sensor.RequestMode != 2) {
-      if (cluster.maxRate > 0.6 * sensor.MaxRateHz) {
-        level = 'High';
-      } else if (cluster.maxRate > 0.3 * sensor.MaxRateHz) {
-        level = 'Medium';
-      }
+      level = getSamplingRateIntensity(sensor.RequestMode, 
+        sensor.MaxRateHz, cluster.maxRate)
       formattedLines.push('Max Sampling Rate in the interval: ' + 
         cluster.maxRate + 'Hz (' + level + ')');
       formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
@@ -1940,5 +1927,29 @@ getColorScale = function(number) {
   }
   return colorScale;
 };
+
+/**
+ * Returns the intensity of the given sampling rate information
+ * @param {number} requestMode Request mode of the sensor.
+ * @param {number} sensorMaxRate The max sampling rate set for the sensor.
+ * @param {number} curMaxRate The max sampling rate seen in the interval.
+ * @return {object} 
+ */
+getSamplingRateIntensity = function (requestMode, sensorMaxRate, curMaxRate) {
+  var intensity = 'low';
+  // The bar is filled with solid color if we are looking at a one-shot
+  // sensor or the if the sensor's maxRate == -1 
+  // (meaning that sampling period = 0s).
+  if (requestMode == 2 || curMaxRate == -1) {
+    intensity = 'high';
+  // Otherwise, set the intensity variable based on the max sampling 
+  // rate occurs in the bar.
+  } else if (curMaxRate > 0.6 * sensorMaxRate) {
+    intensity = 'high';
+  } else if (curMaxRate > 0.3 * sensorMaxRate) {
+    intensity = 'medium';
+  }
+  return intensity;
+}
 
 });  // goog.scope
