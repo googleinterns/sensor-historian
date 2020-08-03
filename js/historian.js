@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -343,6 +343,22 @@ historian.singleView_ = [
         }),
     defaultLevelMetricOverride: '',  // Disable default level metric.
     defaultXExtentLogs: [],  // Fit any shown data.
+    showReportTaken: true
+  },
+  {
+    // New tab for sensor historian.
+    panel: historian.panels_.historian.selector,
+    tabSelector: '#tab-historian-sensor',
+    container: '#historian-sensor',
+    barOrder: [
+    ],
+    barHidden: [],
+    logSources: [
+      historian.historianV2Logs.Sources.SENSORSERVICE_DUMP
+    ],
+    logSourcesHidden: [],
+    defaultLevelMetricOverride: '',  // Disable default level metric.
+    defaultXExtentLogs: [historian.historianV2Logs.Sources.SENSORSERVICE_DUMP],
     showReportTaken: true
   }
 ];
@@ -821,6 +837,8 @@ historian.initialize = function(json) {
   historian.usingComparison = json.usingComparison;
   historian.criticalError = data[0].criticalError;
   historian.reportVersion = data[0].reportVersion;
+  historian.sensorsInfo = data[0].sensorsInfo;
+  
   if (data[0].note) {
     historian.note.show(data[0].note);
   }
@@ -858,6 +876,11 @@ historian.initialize = function(json) {
   if (historian.sdkVersion < 21) {
     historian.showOnlyHistorianV1();
   } else {
+    // Sensor historian only supports andriod sdk version 26 and onwards.
+    if (historian.sdkVersion < 26) {
+      $('sensor-historian').remove();
+    }
+
     if (historian.criticalError) {
       historian.note.show(historian.criticalError);
     }

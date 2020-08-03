@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -274,6 +274,30 @@ rect.bar:hover, circle.bar:hover {
 
 .legend-item.circle {
   border-radius: 50%;
+}
+
+.legend-item.lowRate {
+  background: repeating-linear-gradient(
+    -45deg,
+    white,
+    white 4px,
+    grey 4px,
+    grey 8px
+  );
+}
+
+.legend-item.mediumRate {
+  background: repeating-linear-gradient(
+    -45deg,
+    white,
+    white 2px,
+    grey 2px,
+    grey 4px
+  );
+}
+
+.legend-item.highRate {
+  background-color: grey;
 }
 
 .highlighted-cell {

@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,11 @@ goog.require('historian.metrics');
 goog.require('historian.metrics.Csv');
 goog.require('historian.time');
 
+
+/** @private {function(string): string} */
+historian.color.sensorColorA = d3.scaleOrdinal()
+    .domain(['1', '2-4', '5-7', '>=8'])
+    .range(['#00967d', '#FFC107', '#1E88E5', '#D81B60']);
 
 /**
  * Map from series name to color function.
@@ -502,7 +507,11 @@ historian.color.generateSeriesColors = function(groups) {
 
   groups.getAll().forEach(function(group) {
     group.series.forEach(function(s) {
-      if (s.type == historian.metrics.ERROR_TYPE) {
+      // Handle sensor activities color.
+      if (s.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+        s.color = historian.color.sensorColorA;
+
+      } else if (s.type == historian.metrics.ERROR_TYPE) {
         s.color = historian.color.error_;
 
       // Predefined color functions from config file.

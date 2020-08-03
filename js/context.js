@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-202 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,12 @@ historian.Context = function(container, xExtent, yDomain, barData, levelData,
   // a pattern unless it's in the SVG, so append the container name to make it
   // unique.
   var svgPattern = this.graph.find('svg pattern');
-  svgPattern.attr('id', svgPattern.attr('id') + '-' + container.attr('id'));
+  var containerID = container.attr('id');
+  svgPattern.each( function(_, element) {
+    var oldID = $(element).attr('id');
+    var newID = oldID + "-" + containerID;
+    $(element).attr('id', newID);
+  });
 
   /**
    * The outer svg element.
