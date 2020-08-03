@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -497,10 +497,20 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
         var next = arr[i + 1];
         var overlaps = next.startTime < cur.endTime;
         if (!overlaps) {
-          return;
+          // Errors are recorded such that the startTime equals to endTime, 
+          // so we need to checking for equalities to find overlaps 
+          // between errors.
+          if (series.type == historian.metrics.ERROR_TYPE) {
+            overlaps = (next.startTime == cur.endTime);
+          } else{
+            return;
+          }
         }
-        if (series.type == 'int' || series.type == 'float' ||
-            series.type == 'string' || series.type == 'bool') {
+        // For sensor activities, we do not reset the start/end time.
+        if ((series.source != 
+              historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) &&
+            (series.type == 'int' || series.type == 'float' ||
+             series.type == 'string' || series.type == 'bool')) {
           // These metrics represent state and should never overlap.
           // Sometimes the data gets mangled and they do, in which
           // case we need to fix it to ensure it displays at all.
@@ -1023,15 +1033,18 @@ historian.data.aggregateData_ = function(values) {
     var curEnd = current.endTime;
 
     var numAggregated = aggregatedEntries.length;
-    // If the current entry begins after all the aggregated entries,
-    // don't need to aggregate anything, just create a new entry.
     if (curStart >= aggregatedEntries[numAggregated - 1].endTime) {
-      aggregatedEntries.push({
-        startTime: curStart,
-        endTime: curEnd,
-        services: [current]
-      });
-      continue;
+      // If the current entry begins after all the aggregated entries,
+      // and the current entry do not share the exact same time interval
+      // with aggregated entries, create a new entry.
+      if (curStart != aggregatedEntries[numAggregated - 1].startTime) {
+        aggregatedEntries.push({
+          startTime: curStart,
+          endTime: curEnd,
+          services: [current]
+        });
+        continue;
+      }
     }
     var done = false;
     for (var j = 0; j < aggregatedEntries.length; j++) {
@@ -1454,6 +1467,15 @@ historian.data.ClusterEntry = function(d, forceSingleCount) {
   /** @type {number} */
   this.clusteredCount = 0;
 
+  // This field is for sensor's information only.
+  /** @type {number} */
+  this.sensorNum = 0;
+  
+  // This field is for sensor's information only. 
+  // It records the max sampling rate seen in the cluster.
+  /** @type {number} */
+  this.maxRate = 0;
+
   /** @type {number} */
   this.activeDuration = 0;
 
@@ -1487,9 +1509,10 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
   var entries = d.services || [d];
 
   var totalCount = 0;
+  var maxRate = 0;
+  var sensorNum = 0;
   entries.forEach(function(entry) {
     var key = historian.data.ClusterEntry.key_(entry);
-
     if (!(key in this.clusteredValues)) {
       this.clusteredValues[key] = {
         count: 0,
@@ -1499,6 +1522,15 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
         extra: []
       };
     }
+
+    if ((typeof entry.value) == "string" && 
+      (entry.value.includes("Sensorservice Dump"))) {
+      var v = entry.value.split(',');
+      var curRate = parseFloat(v[8]);
+      maxRate = (curRate > maxRate) ? curRate: maxRate;
+      sensorNum = parseInt(v[4]);
+    }
+
     // Id can be zero, so don't use falsy check.
     var hasId = entry.hasOwnProperty('id');
 
@@ -1524,6 +1556,8 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
     this.clusteredValues[key].duration += duration;
   }, this);
   this.clusteredCount += (forceSingleCount) ? 1 : totalCount;
+  this.maxRate = maxRate;
+  this.sensorNum = sensorNum;
 };
 
 

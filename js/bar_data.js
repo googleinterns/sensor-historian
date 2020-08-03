@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,6 +82,14 @@ historian.BarData = function(container, groups, hidden, order, createList) {
 
   /** @private {boolean} */
   this.filter_ = true;
+
+  /** @param {!Object<boolean>} */
+  this.oldHidden_ = hidden;
+
+  // Set up the app filter selector and add-all-sensor button specifically for 
+  // the sensor historian tab.
+  this.setUpAppFilter();
+  this.setUpAddAllSensors();
 
   this.generateDataToDisplay_(hidden);
   // Assign a row index to each series group.
@@ -368,6 +376,103 @@ historian.BarData.prototype.getMaxIndex = function() {
 /** @private @const {string} */
 historian.BarData.METRICS_SELECTOR_ = 'select.configure-metrics';
 
+/** @private @const {string} */
+historian.BarData.APP_FILTER_ID_ = '#filter-by-app';
+
+/** @private @const {string} */
+historian.BarData.ADD_ALL_SENSOR_ID_ = '#add-all-sensors';
+
+/**
+ * Sets up the add-all-sensors button. Pressing the button will add as much 
+ * sensors to the current graph as possible. It also updates the option list
+ * for the Add-sensor selector.
+ * @private
+ */
+historian.BarData.prototype.setUpAddAllSensors = function() {
+  // Add-all-sensors button is available for historian-sensor tab only.
+  if (!$(this.container_).attr('id').includes('sensor')) {
+    return;
+  }
+  var button = $(historian.BarData.ADD_ALL_SENSOR_ID_);
+  var sensorSelector = this.container_.find(historian.BarData.METRICS_SELECTOR_);
+  sensorSelector.attr('id', 'sensor-selector');
+  button.on('click', function() {
+    // Obtain the list of option values in the sensor-selector.
+    var optionValues = $('#sensor-selector').children('option')
+    .map(function(_,e) {
+      return e.value;
+    }).get();
+    for(let option of optionValues) {
+      // Using regular expression to obtain the name of the sensor.
+      // Once we have a name, add this sensor's activity into the graph and 
+      // remove it from the selector.
+      var source = historian.historianV2Logs.Sources.SENSORSERVICE_DUMP;
+      var matchNameRegEx = /([^]+) \(Sensorservice Dump\)/;
+      var matchName = matchNameRegEx.exec(option);
+      if (matchName) {
+        var name = matchName[1];
+        this.addGroup(source, name);
+        sensorSelector.find('option[value="' + option + '"]').remove();
+        sensorSelector.select2('val', null);
+      }
+    }
+    this.callListeners_();
+  }.bind(this));
+}
+
+/**
+ * Sets up the app filter selector. With a selected app, the graph only displays
+ * sensor information for those sensors that have subscription activities 
+ * related to the chosen app.
+ * @private
+ */
+historian.BarData.prototype.setUpAppFilter = function () {
+  // Filter-by-app selector is for historian-sensor tab only.
+  if (!$(this.container_).attr('id').includes('sensor')) {
+    return;
+  }
+
+  var select = $(historian.BarData.APP_FILTER_ID_);
+  select.on('change', function(event) {
+    if (!event.val) {
+      this.callListeners_();
+      return;
+    }
+    var uid = parseInt(event.val, 10);
+    var app;
+    historian.sensorsInfo.Apps.forEach(function(appObj) {
+      if (uid == 0) {
+        // Handle the case where if the uid = 0, proto buf structure for app
+        // does not have the field for UID.
+        if (!appObj.UID) {
+          app = appObj;
+        }
+      } else if (appObj.UID == uid) {
+        app = appObj;
+      }
+    });
+
+    var sensorsForApp = app.SensorActivities.map(sensor => String(sensor));
+    this.order_.forEach(function(groupProp) {
+      var group = this.getGroups_().get(groupProp.source, groupProp.name);
+      // Look through all the sensors, if the sensor has no activity events
+      // related to the selected app, remove the group, otherwise add it to
+      // the graph and remove this option in the sensor selector.
+      if (!sensorsForApp.includes(group.name)) {
+        // The function removeGroup will handle the case of adding this sensor
+        // to the sensor selector as an option.
+        this.removeGroup(group.source, group.name);
+      } else {
+        this.addGroup(group.source, group.name);
+        var select = this.container_.find(historian.BarData.METRICS_SELECTOR_);
+        var remove = this.groupDesc_({name: group.name, source: group.source});
+        select.find('option[value="' + remove + '"]').remove();
+        select.select2('val', null);
+      }
+    }, this);
+    this.callListeners_();
+  }.bind(this));
+};
 
 /**
  * Creates the series selector for adding hidden groups.
@@ -386,7 +491,11 @@ historian.BarData.prototype.addSeriesSelector_ = function(hidden) {
     return historian.metrics.hash(group) in hidden ? res.concat(group) : res;
   }, []);
   var selectNames = groups.map(this.groupDesc_).sort();
-  historian.utils.setupDropdown(select, selectNames, 'Add Metrics');
+  if (this.container_.attr('id').includes("sensor")) {
+    historian.utils.setupDropdown(select, selectNames, 'Add Sensors');
+  } else {
+    historian.utils.setupDropdown(select, selectNames, 'Add Metrics');
+  }
   select.on('change', function(event) {
     if (!event.val) {
       return;
