@@ -882,17 +882,15 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 		var sensorserviceOutput sensorserviceutils.OutputData
 
 		if supV {
-			sensorserviceOutput = <-sensorserviceCh
 			summariesOutput = <-summariesCh
 			activityManagerOutput = <-activityManagerCh
 			broadcastsOutput = <-broadcastsCh
 			dmesgOutput = <-dmesgCh
 			wearableOutput = <-wearableCh
-			errs = append(errs, append(sensorserviceOutput.ParsingErrs,
-				append(broadcastsOutput.errs,
-					append(dmesgOutput.Errs,
-						append(summariesOutput.errs,
-							activityManagerOutput.Errs...)...)...)...)...)
+			errs = append(errs, append(broadcastsOutput.errs,
+				append(dmesgOutput.Errs,
+					append(summariesOutput.errs,
+						activityManagerOutput.Errs...)...)...)...)
 		}
 
 		warnings = append(warnings, activityManagerOutput.Warnings...)
@@ -905,6 +903,12 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 			bsStats, historianOutput.html,
 			warnings,
 			errs, summariesOutput.overflowMs > 0, true)
+
+		if supV {
+			sensorserviceOutput = <-sensorserviceCh
+			sensorserviceOutput = constructAppName(sensorserviceOutput, data.AppStats)
+			errs = append(errs, sensorserviceOutput.ParsingErrs...)
+		}
 
 		historianV2Logs := []historianV2Log{
 			{
@@ -1022,6 +1026,22 @@ func (pd *ParsedData) parseBugReport(fnameA, contentsA, fnameB, contentsB string
 	return nil
 }
 
+// constructAppName takes in a list of all app information and update the app
+// name in the output produced after parsing sensorservice dump.
+func constructAppName(output sensorserviceutils.OutputData,
+	appStats []presenter.AppStat) sensorserviceutils.OutputData {
+	for _, outputApp := range output.SensorInfo.Apps {
+		for _, appstat := range appStats {
+			if appstat.RawStats.GetUid() == outputApp.GetUID() {
+				outputApp.PackageName = appstat.RawStats.GetName()
+			}
+		}
+	}
+	return output
+}
+
+// analyze takes in the bugreport and information for all packages and produce
+// summary data for battery usage activity found in the bugreport.
 func analyze(bugReport string, pkgs []*usagepb.PackageInfo) summariesData {
 	upm, errs := parseutils.UIDAndPackageNameMapping(bugReport, pkgs)
 

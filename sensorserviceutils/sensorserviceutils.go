@@ -928,7 +928,7 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 		} else {
 			value := fmt.Sprintf("InvalidActivation,%s,%s,%d",
 				msToTime(timestampMs).In(p.loc).Format(timeFormat),
-				conn.GetPackageName(), conn.GetUID())
+				packageName, uid)
 			p.csvState.PrintInstantEvent(csv.Entry{
 				Desc:  p.sensors[sensorNumber].GetName(),
 				Start: timestampMs,

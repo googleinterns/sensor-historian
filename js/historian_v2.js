@@ -77,6 +77,12 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
   /** @private {?number} */
   this.overflowMs_ = data.overflowMs;
 
+  // Construct a selector for app on the sensor historian tab to 
+  // support filtering feature.
+  if ($(this.container_).attr('id').includes('sensor')) {
+    this.setupFilterByAppForSensorHistorian_();
+  }
+
   historian.color.generateSeriesColors(this.data_.barGroups);
 
   /** @private {!historian.BarData} */
@@ -118,6 +124,7 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
                                   this.state_,
                                   powerEstimator,
                                   this.container_);
+                                  
   /** @private {!historian.LevelLine} */
   this.levelLine_ = new historian.LevelLine(this.context_, this.levelData_,
       this.levelSummaryData_, showReportTaken, this.overflowMs_,
@@ -382,3 +389,36 @@ historian.HistorianV2.prototype.handleMouse_ = function() {
         this.levelLine_.hideTimeInfo();
       }.bind(this));
 };
+
+/**
+ * Create the selector to support filtering by app feature 
+ * for sensor historian tab.
+ * @private
+ */
+historian.HistorianV2.prototype.setupFilterByAppForSensorHistorian_ = function (){
+  var settings = $(this.container_).find('.settings');
+  var newSpan = $('<span/>');
+  newSpan.addClass('settings-section');
+  var newSelect = $('<select/>');
+  newSelect.attr('id', 'filter-by-app');
+  newSelect.addClass('filter-by-app');
+  settings.prepend(newSpan.append(newSelect));
+
+  // Set up the dropdown option list for the selector.
+  var filterAppSelector = $('#filter-by-app');
+  filterAppSelector.empty().append('<option></option>');
+  filterAppSelector.select2({
+    placeholder: 'Choose an application',
+    allowClear: true,
+    dropdownAutoWidth: true,
+  });
+  var allAppOptions = [];
+  historian.sensorsInfo.Apps.map(function(app) {
+    var optionText = app.PackageName + ' (Uid: ' + app.UID + ')';
+    var appOption = new Option(optionText, app.UID);
+    allAppOptions.push(appOption);
+  });
+  allAppOptions.forEach(function(appOpt) {
+    filterAppSelector.append(appOpt);
+  });
+}

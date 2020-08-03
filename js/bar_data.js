@@ -83,6 +83,11 @@ historian.BarData = function(container, groups, hidden, order, createList) {
   /** @private {boolean} */
   this.filter_ = true;
 
+  /** @param {!Object<boolean>} */
+  this.oldHidden_ = hidden;
+
+  this.setUpAppFilter();
+
   this.generateDataToDisplay_(hidden);
   // Assign a row index to each series group.
   this.generateIndexes();
@@ -368,6 +373,64 @@ historian.BarData.prototype.getMaxIndex = function() {
 /** @private @const {string} */
 historian.BarData.METRICS_SELECTOR_ = 'select.configure-metrics';
 
+/** @private @const {string} */
+historian.BarData.APP_FILTER_ID_ = '#filter-by-app';
+
+/**
+ * Sets up the app filter selector. With a selected app, the graph only display
+ * sensor information for those sensors that have subscription activities 
+ * with the chosen app.
+ * @param {!Object<boolean>} hidden Groups hidden.
+ * @private
+ */
+historian.BarData.prototype.setUpAppFilter = function(hidden) {
+  // Filter-by-app selector is for historian-sensor tab only.
+  if (!$(this.container_).attr('id').includes('sensor')) {
+    return;
+  }
+
+  var select = $(historian.BarData.APP_FILTER_ID_);
+  select.on('change', function(event) {
+    if (!event.val) {
+      hidden = this.oldHidden_;
+      this.generateDataToDisplay_(hidden);
+      this.callListeners_();
+      return;
+    }
+    hidden = this.oldHidden_;
+    var uid = parseInt(event.val, 10);
+    var app;
+    historian.sensorsInfo.Apps.forEach(function(appObj) {
+      if (uid == 0){
+        // Handle the case where if the uid = 0, proto buf structure for app
+        // does not have the field for UID.
+        if (!appObj.UID) {
+          app = appObj;
+        }
+      } else if (appObj.UID == uid) {
+        app = appObj;
+      }
+    });
+
+    var sensorsForApp = app.SensorActivities.map(sensor => String(sensor));
+    this.order_.forEach(function(groupProp) {
+      var group = this.getGroups_().get(groupProp.source, groupProp.name);
+      if (!sensorsForApp.includes(group.name)) {
+        this.removeGroup(group.source, group.name);
+        hidden[historian.metrics.hash(group)] = true;
+      } else{
+        this.addGroup(group.source, group.name);
+        hidden[historian.metrics.hash(group)] = false;
+        var select = this.container_.find(historian.BarData.METRICS_SELECTOR_);
+        var remove = this.groupDesc_({name: group.name, source: group.source});
+        select.find('option[value="' + remove + '"]').remove();
+        select.select2('val', null);
+      }
+    }, this);
+    this.generateDataToDisplay_(hidden);
+    this.callListeners_();
+  }.bind(this));
+};
 
 /**
  * Creates the series selector for adding hidden groups.
@@ -386,7 +449,11 @@ historian.BarData.prototype.addSeriesSelector_ = function(hidden) {
     return historian.metrics.hash(group) in hidden ? res.concat(group) : res;
   }, []);
   var selectNames = groups.map(this.groupDesc_).sort();
-  historian.utils.setupDropdown(select, selectNames, 'Add Metrics');
+  if (this.container_.attr('id').includes("sensor")) {
+    historian.utils.setupDropdown(select, selectNames, 'Add Sensors');
+  } else {
+    historian.utils.setupDropdown(select, selectNames, 'Add Metrics');
+  }
   select.on('change', function(event) {
     if (!event.val) {
       return;
