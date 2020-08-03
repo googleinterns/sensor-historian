@@ -814,14 +814,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
           if (series.type == historian.metrics.ERROR_TYPE){
             return "red";
           }
-          var colorScale = ">=8";
-          if (bar.clusteredCount < 2) {
-            colorScale = "1";
-          } else if (bar.clusteredCount < 5) {
-            colorScale = "2-4";
-          } else if (bar.clusteredCount < 7) {
-            colorScale = "5-7";
-          }
+          var colorScale = getColorScale(bar.clusteredCount);
           var baseColor = series.color(colorScale);
           return baseColor;
         }
@@ -836,31 +829,12 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
 
       var sensorPattern = function(bar) {
+
         if (series.type == historian.metrics.ERROR_TYPE){
           return "red";
         }
-        var sensor;
-        historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
-          // Accomodate the case where sensor number is 0, the protobuf
-          // message does not have the field for Number
-          if (bar.sensorNum == 0) {
-            if (!sensorObj.Number) {
-              sensor = sensorObj;
-            }
-          } else if (sensorObj.Number == bar.sensorNum) {
-            sensor = sensorObj;
-          }
-        });
-
-        var color = 'red';
-        if (bar.clusteredCount < 2) {
-          color = 'green';
-        } else if (bar.clusteredCount < 5) {
-          color = 'yellow';
-        } else if (bar.clusteredCount < 7) {
-          color = 'blue';
-        }
-            
+        var sensor = getSensorByNumber(bar.sensorNum);
+        var color = getColorScale(bar.clusteredCount);            
         var samplingRate = 'low';
         // For one-shot sensor, samplingRate is set to be medium, otherwise
         // set the samplingRate variable based on the max sampling rate occurs
@@ -1247,20 +1221,8 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
-  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP &&
-    series.type != historian.metrics.ERROR_TYPE) {
-    var sensor;
-    historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
-      // Accomodate the case where sensor number is 0, the protobuf
-      // message does not have the field for Number
-      if (cluster.sensorNum == 0) {
-        if (!sensorObj.Number) {
-          sensor = sensorObj;
-        }
-      } else if (sensorObj.Number == cluster.sensorNum) {
-        sensor = sensorObj;
-      }
-    });
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+    var sensor = getSensorByNumber(cluster.sensorNum);
     // Show the sampling rate information in the floating window.
     var level = 'Low';
     if (sensor.RequestMode != 2) {
@@ -2052,6 +2014,44 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
   } else {
     return this.getRowY(idx + .7);
   }
+};
+
+/**
+ * Returns the sensor object corresponding to the given sensor number.
+ * @param {number} number The number for the sensor that we want.
+ * @return {object} 
+ */
+getSensorByNumber = function(number) {
+  var sensor;
+  historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+    // Accomodate the case where the protobuf message does not have the field 
+    // for number if the value stored is 0.
+    if (number == 0) {
+      if (!sensorObj.Number) {
+        sensor = sensorObj;
+      }
+    } else if (sensorObj.Number == number) {
+      sensor = sensorObj;
+    }
+  });
+  return sensor;
+};
+
+/**
+ * Returns the color scale corresponding to the given client count number.
+ * @param {number} number The number for client count.
+ * @return {object} 
+ */
+getColorScale = function(number) {
+  var colorScale = ">=8";
+  if (number < 2) {
+    colorScale = "1";
+  } else if (number < 5) {
+    colorScale = "2-4";
+  } else if (number < 7) {
+    colorScale = "5-7";
+  }
+  return colorScale;
 };
 
 });  // goog.scope
