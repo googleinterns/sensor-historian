@@ -416,7 +416,7 @@ historian.Bars.prototype.renderLabels_ = function() {
     this.barData_.getLegend(group.name).forEach(function(entry) {
       if (group.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP && 
         entry.isCircle) {
-        // Avoid adding legend item for errors.
+        // Avoid adding legend item for errors repeatedly.
         return;
       }
       var rectHtml = $('<div/>', {
@@ -438,20 +438,24 @@ historian.Bars.prototype.renderLabels_ = function() {
         }
       }).prop('outerHTML');
       lines.splice(2, 0, errorLegend + "Error")
-      lines.splice(3, 0, "Color corresponds to client count:");
-      lines.push("Pattern shows sampling rate:");
-      var low = $('<div/>', {
-        'class': 'legend-item lowRate',
-      }).prop('outerHTML');
-      lines.push(low + "Low");
-      var medium = $('<div/>', {
-        'class': 'legend-item mediumRate',
-      }).prop('outerHTML');
-      lines.push(medium + "Medium");
-      var high = $('<div/>', {
-        'class': 'legend-item highRate',
-      }).prop('outerHTML');
-      lines.push(high + "High");
+      // If the series only has error messages, then all the legends for 
+      // regular subscription events will not be shown.
+      if (lines.length > 3) {
+        lines.splice(3, 0, "Color corresponds to client count:");
+        lines.push("Pattern shows sampling rate:");
+        var low = $('<div/>', {
+          'class': 'legend-item lowRate',
+        }).prop('outerHTML');
+        lines.push(low + "Low");
+        var medium = $('<div/>', {
+          'class': 'legend-item mediumRate',
+        }).prop('outerHTML');
+        lines.push(medium + "Medium");
+        var high = $('<div/>', {
+          'class': 'legend-item highRate',
+        }).prop('outerHTML');
+        lines.push(high + "High");
+      }
     }
     this.legendTooltip_ =
         new historian.Tooltip(lines, this.state_, 'help-tooltip');
@@ -811,7 +815,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         // Color for sensor historian is specifically chosen.
         if (series.source == 
           historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
-          if (series.type == historian.metrics.ERROR_TYPE){
+          if (series.type == historian.metrics.ERROR_TYPE) {
             return "red";
           }
           var colorScale = getColorScale(bar.clusteredCount);
@@ -827,13 +831,16 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var showBars = this.container_.find(SHOW_BARS_TOGGLE_).is(':checked');
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
-
+      
       var sensorPattern = function(bar) {
+        if (series.type == historian.metrics.ERROR_TYPE) {
+          return "red";
+        }
         var sensor = getSensorByNumber(bar.sensorNum);
         var color = getColorScale(bar.clusteredCount);            
-        var samplingRate = getSamplingRateIntensity(sensor.RequestMode, 
-          sensor.MaxRateHz, bar.MaxRate)
-        var fill = 'url("#' + color + '-' + samplingRate + '-historian-sensor")';
+        var intensity = getSamplingRateIntensity(bar.maxRate, 
+          sensor.RequestMode, sensor.MaxRateHz);
+        var fill = 'url("#' + color + '-' + intensity + '-historian-sensor")';
         return fill;
       }
 
@@ -943,6 +950,8 @@ historian.Bars.prototype.updateSeries_ = function() {
         values = this.filterServices(values, uid);
       }
 
+      // Once the app filter selects an app, update the values for all series
+      // to only include events related to the chosen app.
       var selectedAppUID = $(historian.BarData.APP_FILTER_ID_).val();
       if (selectedAppUID != null && selectedAppUID != "") {
         values = this.filterByAppUid_(values, selectedAppUID);
@@ -1017,7 +1026,7 @@ historian.Bars.prototype.filter_ = function(data, callback) {
 
 
 /**
- * Returns sensor entries that involves activity for the app with the given UID.
+ * Returns sensor entries that have activities for the app with the given UID.
  * @param {!Array<(!historian.Entry|!historian.AggregatedEntry)>} data
  *     The data to filter.
  * @param {string} uid The app uid to match.
@@ -1027,9 +1036,28 @@ historian.Bars.prototype.filter_ = function(data, callback) {
  */
 historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
   return this.filter_(data, function(entry) {
-    var value = entry.value;
-    var valueMap = value.split(",");
-    var eventUID = valueMap[6];
+    // Only keep the entries that corresponds to the given uid.
+    var valueMap = entry.value.split(",");
+    var eventUID;
+    switch(valueMap[0]) {
+      // For error entry, the value field starts with an error tag, so we
+      // case on the error tag to get the uid.
+      case 'SensorNotActive':
+      case 'InvalidActivation':
+      case 'MultipleActivation':
+      case 'MultipleDe-Activation':
+        eventUID = valueMap[3];
+        break
+      case 'Non-existingSensor':
+        // This error will not corresponds to any app since the app uid will 
+        // not be parsed for subscription event with an non-existing sensor.
+        break
+      default :
+        // For regular sensor subscription event, uid is recorded as the 
+        // 6th value.
+        eventUID = valueMap[6];
+        break
+    }
     return eventUID == uid;
   });
 };
@@ -1208,28 +1236,30 @@ historian.Bars.prototype.tooltipText_ = function(
   }
 
   formattedLines.push(cluster.clusteredCount + ' occurences');
-  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP &&
-    series.type != historian.metrics.ERROR_TYPE) {
-    var sensor;
-    historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
-      // Accomodate the case where sensor number is 0, the protobuf
-      // message does not have the field for Number
-      if (cluster.sensorNum == 0) {
-        if (!sensorObj.Number) {
-          sensor = sensorObj;
+  if (series.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
+    if (series.type != historian.metrics.ERROR_TYPE) {
+      var sensor = getSensorByNumber(cluster.sensorNum);
+      var mode = (!sensor.RequestMode) ? 0 : sensor.RequestMode;
+      var requestModeStr = historian.metrics.RequestMode[mode];
+      formattedLines[0] = this.bold_(name + " (" + requestModeStr+ ")", toHtml);
+      // Show the sampling rate information in the floating window.
+      // For one-shot sensor, no sampling information will be shown.
+      if (requestModeStr != "One-shot") {
+        // maxRate = -1 means that sampling period is 0. Therefore sampling rate
+        // quantity is not applicable. No sampling information will be shown.
+        // Otherwise, sampling information and the corresponding intensity level
+        // will be shown.
+        if (sensor.MaxRateHz != -1) {
+          var level = getSamplingRateIntensity(sensor.RequestMode, 
+            cluster.maxRate, sensor.MaxRateHz);
+          formattedLines.push('Max Sampling Rate in the interval: ' + 
+            cluster.maxRate + 'Hz (' + level + ')');
+          formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
+            sensor.MaxRateHz + 'Hz');
+        } else {
+          formattedLines.push('Max Delay is 0 second.')
         }
-      } else if (sensorObj.Number == cluster.sensorNum) {
-        sensor = sensorObj;
       }
-    });
-    // Show the sampling rate information in the floating window.
-    if (sensor.RequestMode != 2) {
-      level = getSamplingRateIntensity(sensor.RequestMode, 
-        sensor.MaxRateHz, cluster.maxRate)
-      formattedLines.push('Max Sampling Rate in the interval: ' + 
-        cluster.maxRate + 'Hz (' + level + ')');
-      formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
-        sensor.MaxRateHz + 'Hz');
     }
   }
 
@@ -1393,32 +1423,22 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
     'Error'
   ];
 
-  var bodyRows = values.map(function(entry) {
+  var bodyRows = [];
+  values.forEach(function(entry) {
     var v = entry.value.split(',');
     var uid, packageName, errorMsg;
     // Obtain the uid and package name from the error message, it is possible
-    // that some error message does not contain ui and package name information.
+    // that some error message does not contain uid or package name information.
     var commonErrorTag = ['SensorNotActive', 'Non-existingSensor', 
-      'TwoSamplingRate', 'TwoBatchingPeriod', 'InvalidActivation', 
-      'MultipleActivation', 'MultipleDe-Activation', ];
+      'InvalidActivation', 'MultipleActivation', 'MultipleDe-Activation', ];
     if (commonErrorTag.includes(v[0])) {
-        uid = v[2];
-        packageName = v[3];
+      packageName = v[2];
+      uid = v[3];
     }
     switch(v[0]) {
       case 'SensorNotActive':
         errorMsg = 'This sensor has an ongoing connection to the listed ' + 
           'uid and package name.';
-        break;
-      case 'TwoSamplingRate':
-        errorMsg = 'Two sampling rates found: ' + 
-          v[4] + 'Hz from subscription history; ' +
-          v[5] + 'Hz from active sensor section.';  
-        break;
-      case 'TwoBatchingPeriod':
-        errorMsg = 'Two batching period found: ' + 
-          v[4] + 's from subscription history; ' +
-          v[5] + 's from active sensor section.';  
         break;
       case 'InvalidActivation':
         errorMsg = 'This activation should result in an active connection.';
@@ -1435,7 +1455,14 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
       default:
         errorMsg = entry.value;
     }
-    return [v[1], uid, packageName, errorMsg];
+    var singleRow = [v[1], uid, packageName, errorMsg];
+    // It is possible that multiple events with the same values are created, 
+    // then the entry.count field will record the number of events having this
+    // entry value. We want to show all events even though the values 
+    // are repeated.
+    for (var i = 0; i < entry.count; i++) {
+      bodyRows.push(singleRow);
+    }
   });
 
   return {header: headRow, body: bodyRows};
@@ -1458,35 +1485,85 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
     'Package Name',
   ];
   if (!values[0].value.includes("ONE_SHOT")) {
-    headRow.push('Sampling Rate(Hz)');
-    headRow.push('Batching Period(s)');
+    headRow.push('Requested\nSampling Rate (Hz)');
+    headRow.push('Requested\nBatching Period (s)');
   }
-  headRow.push('Source');
   headRow.push('Total Duration');
 
   var highlightActiveConn = [];
-  var bodyRows = values.map(function(entry, index) {
+  var bodyRows = [];
+  values.forEach(function(entry, index) {
     var v = entry.value.split(',');
     var startMs = parseInt(v[1],10);
+    var startTime = v[0];
     var endMs = parseInt(v[3],10);
+    var endTime = v[2];
     var durationOutput = historian.time.formatDuration(endMs - startMs);
 
-    // Highlight the row related to active connection.
-    if (v[v.length - 1] == "isActiveConn") {
-      highlightActiveConn.push(index);
-    }
     // Batching Period = -1 is a default value set for active connections 
     // without a history.
-    var batching = (v[9] == "-1.00") || (v[9] == "0.00")? "Not batching" : v[9];
-
-    var samplingRate = v[8]
-    if ((v[5].includes("ON_CHANGE")) && samplingRate == "-1.00") {
-      samplingRate = "on-change"
+    var batching = v[9];
+    if (v[9] == "-1.00") {
+      batching = "Unavailable";
     }
 
-    return headRow.length > 6 ? 
-    [v[0], v[2], v[6], v[7], samplingRate, batching, v[10], durationOutput] :
-    [v[0], v[2], v[6], v[7], v[10], durationOutput];
+    var samplingRate = v[8]
+    if (samplingRate == "-1.00") {
+      samplingRate = "Sampling Period\nis 0 second";
+    }
+
+    var isActive = false;
+    if (v[v.length - 1] == "isActiveConn") {
+      highlightActiveConn.push(index);
+      isActive = true;
+      endTime = "Running";
+      durationOutput = "Active Connection";
+      // For active connection, we also show the actual sampling rate and 
+      // batching period information if available.
+      if (headRow.length == 7) {
+        headRow.push('Actual Sampling\nRate (Hz)');
+        headRow.push('Actual Batching\nPeriod (s)');
+      }
+      var sensorNum = v[4];
+      var sensorObj = getSensorByNumber(sensorNum);
+      var actualSamplingRate = sensorObj.runningSamplingRateHz;
+      var actualBatchingPeriod = sensorObj.runningBatchingPeriodS;
+      if (!actualBatchingPeriod) {
+        actualBatchingPeriod = "Not batching";
+      }
+      if (actualSamplingRate == "-1.00") {
+        actualSamplingRate = "(Not Applicalbe)\nSampling Period\nis 0 second";
+      }
+    }
+
+    // Do not show the start time and duration for subscription event with
+    // no activation statement. Also the requested sampling rate and batching
+    // period information will be missing.
+    if (v[v.length - 1] == "NoActivation") {
+      startTime = "Unknown";
+      durationOutput = "No activation\nfound in history";
+      samplingRate = "Unavailable";
+      batching = "Unavailable";
+    }
+
+    var singleRow;
+
+    if (headRow.length == 5) {
+      singleRow = [startTime, endTime, v[6], v[7], durationOutput];
+    } else if (isActive) {
+      singleRow = [startTime, endTime, v[6], v[7], samplingRate, batching, 
+        durationOutput,actualSamplingRate, actualBatchingPeriod];
+    } else {
+      singleRow = [startTime, endTime, v[6], v[7], samplingRate, batching, 
+        durationOutput];
+    }
+    // It is possible that multiple events with the same values are created, 
+    // then the entry.count field will record the number of events having this
+    // entry value.We want to show all events even though the values 
+    // are repeated.
+    for (var i = 0; i < entry.count; i++) {
+      bodyRows.push(singleRow);
+    }
   });
 
   highlightActiveConn.forEach(function(row) {
@@ -2049,18 +2126,10 @@ getColorScale = function(number) {
   return colorScale;
 };
 
-/**
- * Returns the intensity of the given sampling rate information
- * @param {number} requestMode Request mode of the sensor.
- * @param {number} sensorMaxRate The max sampling rate set for the sensor.
- * @param {number} curMaxRate The max sampling rate seen in the interval.
- * @return {object} 
- */
-getSamplingRateIntensity = function (requestMode, sensorMaxRate, curMaxRate) {
+getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
   var intensity = 'low';
   // The bar is filled with solid color if we are looking at a one-shot
-  // sensor or the if the sensor's maxRate == -1 
-  // (meaning that sampling period = 0s).
+  // sensor or the curMaxRate == -1 (meaning that sampling period = 0s).
   if (requestMode == 2 || curMaxRate == -1) {
     intensity = 'high';
   // Otherwise, set the intensity variable based on the max sampling 
