@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,6 +79,14 @@ historian.metrics.UNAVAILABLE_TYPE = 'unavailable';
  */
 historian.metrics.ROC_SUFFIX = ' (Rate of change)';
 
+
+/**
+ * The list containing all request mode for sensors.
+ * @const {!Array<string>}
+ */
+historian.metrics.RequestMode = [
+  'Continuous', 'On-change', 'One-shot', 'Special',
+]
 
 /**
  * The string representing the metric in the historian V2 CSV input.

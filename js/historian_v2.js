@@ -1,5 +1,5 @@
 /**
- * Copyright 2016 Google LLC. All Rights Reserved.
+ * Copyright 2016-2020 Google LLC. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,8 @@ historian.HistorianV2 = function(container, data, levelSummaryData, state,
   // Construct a selector for app on the sensor historian tab to 
   // support filtering feature.
   if ($(this.container_).attr('id').includes('sensor')) {
-    this.setupFilterByAppForSensorHistorian_();
+    this.setUpAddAllSensorButton_();
+    this.setUpFilterByAppForSensorHistorian_();
   }
 
   historian.color.generateSeriesColors(this.data_.barGroups);
@@ -391,11 +392,11 @@ historian.HistorianV2.prototype.handleMouse_ = function() {
 };
 
 /**
- * Create the selector to support filtering by app feature 
+ * Creates the selector to support filtering by app feature 
  * for sensor historian tab.
  * @private
  */
-historian.HistorianV2.prototype.setupFilterByAppForSensorHistorian_ = function (){
+historian.HistorianV2.prototype.setUpFilterByAppForSensorHistorian_ = function () {
   var settings = $(this.container_).find('.settings');
   var newSpan = $('<span/>');
   newSpan.addClass('settings-section');
@@ -421,4 +422,19 @@ historian.HistorianV2.prototype.setupFilterByAppForSensorHistorian_ = function (
   allAppOptions.forEach(function(appOpt) {
     filterAppSelector.append(appOpt);
   });
+}
+
+/**
+ * Creates the button to add all sensors' activities to the graph for 
+ * sensor historian tab.
+ * @private
+ */
+historian.HistorianV2.prototype.setUpAddAllSensorButton_ = function () {
+  var settings = $(this.container_).find('.settings');
+  var newButton = $('<button/>');
+  newButton.addClass('settings-section');
+  newButton.attr('id', 'add-all-sensors');
+  newButton.addClass('add-all-sensors');
+  settings.prepend(newButton);
+  $("#add-all-sensors").html("Add All Sensors");
 }
