@@ -1430,7 +1430,8 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
     // Obtain the uid and package name from the error message, it is possible
     // that some error message does not contain uid or package name information.
     var commonErrorTag = ['SensorNotActive', 'Non-existingSensor', 
-      'InvalidActivation', 'MultipleActivation', 'MultipleDe-Activation', ];
+      'InvalidActivation', 'MultipleActivation', 'MultipleDe-Activation', 
+      'MultipleActiveConnection'];
     if (commonErrorTag.includes(v[0])) {
       packageName = v[2];
       uid = v[3];
@@ -1451,6 +1452,9 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
         break;
       case 'Non-existingSensor':
         errorMsg = 'This sensor does not exist.';
+        break;
+      case 'MultipleActiveConnection':
+        errorMsg = 'This active connection has already been seen.';
         break;
       default:
         errorMsg = entry.value;
@@ -1526,8 +1530,8 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
       }
       var sensorNum = v[4];
       var sensorObj = getSensorByNumber(sensorNum);
-      var actualSamplingRate = sensorObj.runningSamplingRateHz;
-      var actualBatchingPeriod = sensorObj.runningBatchingPeriodS;
+      var actualSamplingRate = sensorObj.ActualSamplingRateHz;
+      var actualBatchingPeriod = sensorObj.ActualBatchingPeriodS;
       if (!actualBatchingPeriod) {
         actualBatchingPeriod = "Not batching";
       }
