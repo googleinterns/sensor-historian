@@ -189,6 +189,10 @@ type parser struct {
 	// an identifier formed by concatenating sensor number and package name.
 	activeConns map[string]*sipb.ActiveConn
 
+	// repeatedActiveConn is a list of active connections that have shown
+	// multiple times in the sensorservice dump.
+	repeatedActiveConn []*sipb.ActiveConn
+
 	// directConns is a map from an identifier to the relevant connection
 	// information.
 	directConns map[string]*sipb.DirectConn
@@ -293,7 +297,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 		}
 		// Parse active connection information.
 		if m, _ := historianutils.SubexpNames(activeConnRE, l); m {
-			p.parsingErrs = p.extractActiveConnInfo()
+			p.repeatedActiveConn, p.parsingErrs = p.extractActiveConnInfo()
 			continue
 		}
 		// Parse direct connection information.
@@ -309,6 +313,7 @@ func Parse(f string, meta *bugreportutils.MetaInfo) OutputData {
 	}
 	p.createUnseenActiveConnectionHistory()
 	p.createHistoryForEventsWithNoActivation()
+	p.reportErrorForRepeatedActiveConn()
 	return OutputData{p.buf.String(), p.allSensorInfo(),
 		p.parsingErrs}
 }
@@ -550,8 +555,8 @@ func (p parser) extractActiveSensorInfo() []error {
 			samplingRateHz := historianutils.PeriodUsToRateHz(samplingPeriodUs)
 			batchingPeriodS := math.Round(bPeriodMs*0.1) / 100
 			p.sensors[sensorNumber].IsActive = true
-			p.sensors[sensorNumber].RunningSamplingRateHz = samplingRateHz
-			p.sensors[sensorNumber].RunningBatchingPeriodS = batchingPeriodS
+			p.sensors[sensorNumber].ActualSamplingRateHz = samplingRateHz
+			p.sensors[sensorNumber].ActualBatchingPeriodS = batchingPeriodS
 		}
 	}
 	return p.parsingErrs
@@ -619,7 +624,7 @@ func (p parser) organizeSensorInfoForActiveConn(connNum int32,
 
 // extractActiveConnInfo extracts active connections information found in
 // the sensorservice dump of a bugreport.
-func (p parser) extractActiveConnInfo() []error {
+func (p parser) extractActiveConnInfo() ([]*sipb.ActiveConn, []error) {
 	curConnNum := int32(0)
 	// connections is a map from active connection number to
 	// information for the relevant connection.
@@ -683,6 +688,9 @@ func (p parser) extractActiveConnInfo() []error {
 	for _, conn := range connections {
 		identifier := fmt.Sprintf("%d,%d,%s", conn.SensorNumber, conn.UID,
 			conn.PackageName)
+		if _, exist := p.activeConns[identifier]; exist {
+			p.repeatedActiveConn = append(p.repeatedActiveConn, conn)
+		}
 		p.activeConns[identifier] = conn
 		// Record the sensor activity for the app
 		if _, exist := p.apps[conn.UID]; !exist {
@@ -692,7 +700,26 @@ func (p parser) extractActiveConnInfo() []error {
 		curApp := p.apps[conn.UID]
 		curApp[conn.SensorNumber] = true
 	}
-	return p.parsingErrs
+	return p.repeatedActiveConn, p.parsingErrs
+}
+
+// reportErrorForRepeatedActiveConn is a helper function that reports error for
+// active connections that show up for multiple times in the bugreport. Each
+// active connection is supposed to contain unique connection information
+// between an app and a sensor
+func (p parser) reportErrorForRepeatedActiveConn() {
+	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
+		p.referenceDay, p.referenceTime)
+	for _, conn := range p.repeatedActiveConn {
+		value := fmt.Sprintf("MultipleActiveConnection,%s,%s,%d",
+			p.referenceTime, conn.GetPackageName(), conn.GetUID())
+		p.csvState.PrintInstantEvent(csv.Entry{
+			Desc:  p.sensors[conn.GetSensorNumber()].GetName(),
+			Start: referenceTimestampMs,
+			Type:  typeError,
+			Value: value,
+		})
+	}
 }
 
 // organizeSensorInfoForDirectConn is a helper function that specifically
@@ -868,24 +895,41 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 	start := msToTime(timestampMs).In(p.loc).Format(timeFormat)
 	if _, exist := p.history[identifier]; !exist {
 		// If there is no history of de-activating a subscription,
-		// the subscription has to be active.
+		// the subscription may results in an active connection.
 		conn, isActive := p.activeConns[identifier]
-		if isActive && !conn.HasSensorserviceRecord {
-			conn.HasSensorserviceRecord = true
-			conn.RequestedSamplingRateHz = samplingRateHz
-			conn.RequestedBatchingPeriodS = batchingPeriodS
-			p.activeConns[identifier] = conn
+		if isActive {
+			// If there exists a corresponding active connection and it has not
+			// been recorded, record this active connection
+			if !conn.HasSensorserviceRecord {
+				conn.HasSensorserviceRecord = true
+				conn.RequestedSamplingRateHz = samplingRateHz
+				conn.RequestedBatchingPeriodS = batchingPeriodS
+				p.activeConns[identifier] = conn
+				// For active connection, set current time as the end time
+				// for the ongoing subscription event.
+				end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
+				value := fmt.Sprintf("%v,%v,%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s",
+					start, timestampMs, end, referenceTimestampMs,
+					sensorNumber, p.sensors[sensorNumber].RequestMode,
+					uid, packageName, samplingRateHz, batchingPeriodS,
+					sensorDump, "isActiveConn")
+				p.csvState.Print(sensorName, "string", timestampMs,
+					referenceTimestampMs, value, "")
 
-			// For active connection, set current time as the end time
-			// for the ongoing subscription event.
-			end := msToTime(referenceTimestampMs).In(p.loc).Format(timeFormat)
-			value := fmt.Sprintf("%v,%v,%v,%v,%d,%s,%d,%s,%.2f,%.2f,%s,%s",
-				start, timestampMs, end, referenceTimestampMs,
-				sensorNumber, p.sensors[sensorNumber].RequestMode,
-				uid, packageName, samplingRateHz, batchingPeriodS,
-				sensorDump, "isActiveConn")
-			p.csvState.Print(sensorName, "string", timestampMs,
-				referenceTimestampMs, value, "")
+				// If this active connection has already been recorded, mark a
+				// multiple activation error.
+			} else {
+				value := fmt.Sprintf("MultipleActivation,%s,%s,%d",
+					start, packageName, uid)
+				p.csvState.PrintInstantEvent(csv.Entry{
+					Desc:  p.sensors[sensorNumber].GetName(),
+					Start: timestampMs,
+					Type:  typeError,
+					Value: value,
+				})
+			}
+			// Otherwise, this activation statement does not correspond to any
+			// active connection, so we mark an invalid activation error.
 		} else {
 			value := fmt.Sprintf("InvalidActivation,%s,%s,%d",
 				start, packageName, uid)
@@ -925,6 +969,7 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 				samplingRateHz, batchingPeriodS, sensorDump)
 			p.csvState.Print(sensorName, "string", timestampMs, eventInfo.EndMs,
 				value, "")
+			// delete(p.history, identifier)
 		}
 	}
 
