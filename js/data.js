@@ -497,7 +497,14 @@ historian.data.processHistorianV2Data = function(logs, deviceCapacity,
         var next = arr[i + 1];
         var overlaps = next.startTime < cur.endTime;
         if (!overlaps) {
-          return;
+          // Errors are recorded such that the startTime equals to endTime, 
+          // so we need to checking for equalities to find overlaps 
+          // between errors.
+          if (series.type == historian.metrics.ERROR_TYPE) {
+            overlaps = (next.startTime == cur.endTime);
+          } else {
+            return;
+          }
         }
         // For sensor activities, we do not reset the start/end time.
         if ((series.source != 
@@ -1026,15 +1033,18 @@ historian.data.aggregateData_ = function(values) {
     var curEnd = current.endTime;
 
     var numAggregated = aggregatedEntries.length;
-    // If the current entry begins after all the aggregated entries,
-    // don't need to aggregate anything, just create a new entry.
     if (curStart >= aggregatedEntries[numAggregated - 1].endTime) {
-      aggregatedEntries.push({
-        startTime: curStart,
-        endTime: curEnd,
-        services: [current]
-      });
-      continue;
+      // If the current entry begins after all the aggregated entries,
+      // and the current entry do not share the exact same time interval
+      // with aggregated entries, create a new entry.
+      if (curStart != aggregatedEntries[numAggregated - 1].startTime) {
+        aggregatedEntries.push({
+          startTime: curStart,
+          endTime: curEnd,
+          services: [current]
+        });
+        continue;
+      }
     }
     var done = false;
     for (var j = 0; j < aggregatedEntries.length; j++) {
@@ -1514,7 +1524,7 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
     }
 
     if ((typeof entry.value) == "string" && 
-      (entry.value.includes("Sensorservice Dump"))){
+      (entry.value.includes("Sensorservice Dump"))) {
       var v = entry.value.split(',');
       var curRate = parseFloat(v[8]);
       maxRate = (curRate > maxRate) ? curRate: maxRate;

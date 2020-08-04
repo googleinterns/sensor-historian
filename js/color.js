@@ -508,7 +508,7 @@ historian.color.generateSeriesColors = function(groups) {
   groups.getAll().forEach(function(group) {
     group.series.forEach(function(s) {
       // Handle sensor activities color.
-      if (s.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP){
+      if (s.source == historian.historianV2Logs.Sources.SENSORSERVICE_DUMP) {
         s.color = historian.color.sensorColorA;
 
       } else if (s.type == historian.metrics.ERROR_TYPE) {

@@ -877,7 +877,7 @@ historian.initialize = function(json) {
     historian.showOnlyHistorianV1();
   } else {
     // Sensor historian only supports andriod sdk version 26 and onwards.
-    if (historian.sdkVersion < 26){
+    if (historian.sdkVersion < 26) {
       $('sensor-historian').remove();
     }
 
