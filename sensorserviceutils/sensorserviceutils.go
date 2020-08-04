@@ -1095,8 +1095,8 @@ func (p *parser) extractRegistrationHistory() []error {
 }
 
 // createHistoryForEventsWithNoActivation is a function that create history
-// for sensor activities such that deactivation statement is present but no 
-// activation statement is seen in the sensor dump history. 
+// for sensor activities such that deactivation statement is present but no
+// activation statement is seen in the sensor dump history.
 // The visualizer will show the event as it starts
 // when the sensor history first starts.
 func (p parser) createHistoryForEventsWithNoActivation() {
@@ -1134,7 +1134,7 @@ func (slice activeConns) Swap(i, j int) {
 }
 
 // createUnseenActiveConnectionHistory is a function that creates subscription
-// events for active connections without any activation statement seen 
+// events for active connections without any activation statement seen
 // in the history.
 func (p parser) createUnseenActiveConnectionHistory() {
 	referenceTimestampMs, _ := p.fullTimestampInMs(p.referenceMonth,
