@@ -928,9 +928,9 @@ func (p *parser) processActivation(timestampMs int64, sensorNumber, uid int32,
 					Value: value,
 				})
 			}
+		} else {
 			// Otherwise, this activation statement does not correspond to any
 			// active connection, so we mark an invalid activation error.
-		} else {
 			value := fmt.Sprintf("InvalidActivation,%s,%s,%d",
 				start, packageName, uid)
 			p.csvState.PrintInstantEvent(csv.Entry{
@@ -1097,8 +1097,8 @@ func (p *parser) extractRegistrationHistory() []error {
 // createHistoryForEventsWithNoActivation is a function that create history
 // for sensor activities such that deactivation statement is present but no
 // activation statement is seen in the sensor dump history.
-// The visualizer will show the event as it starts
-// when the sensor history first starts.
+// The visualizer will show the event as it starts when the sensor history
+// first starts.
 func (p parser) createHistoryForEventsWithNoActivation() {
 	start := msToTime(p.earliestTimestampMs).In(p.loc).Format(timeFormat)
 	for _, event := range p.history {
