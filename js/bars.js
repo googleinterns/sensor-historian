@@ -442,19 +442,25 @@ historian.Bars.prototype.renderLabels_ = function() {
       // regular subscription events will not be shown.
       if (lines.length > 3) {
         lines.splice(3, 0, "Color corresponds to client count:");
-        lines.push("Pattern shows sampling rate:");
-        var low = $('<div/>', {
-          'class': 'legend-item lowRate',
-        }).prop('outerHTML');
-        lines.push(low + "Low");
-        var medium = $('<div/>', {
-          'class': 'legend-item mediumRate',
-        }).prop('outerHTML');
-        lines.push(medium + "Medium");
-        var high = $('<div/>', {
-          'class': 'legend-item highRate',
-        }).prop('outerHTML');
-        lines.push(high + "High");
+        var sensor = getSensorByName(group.name);
+        var mode = (!sensor.RequestMode) ? 0 : sensor.RequestMode;
+        var requestModeStr = historian.metrics.RequestMode[mode];
+        lines[0] = '<b>' + group.name + ' (' + requestModeStr + ') </b>';
+        if (sensor.MaxRateHz > 0) {
+          lines.push("Pattern shows sampling rate:");
+          var low = $('<div/>', {
+            'class': 'legend-item lowRate',
+          }).prop('outerHTML');
+          lines.push(low + "Low");
+          var medium = $('<div/>', {
+            'class': 'legend-item mediumRate',
+          }).prop('outerHTML');
+          lines.push(medium + "Medium");
+          var high = $('<div/>', {
+            'class': 'legend-item highRate',
+          }).prop('outerHTML');
+          lines.push(high + "High");
+        }
       }
     }
     this.legendTooltip_ =
@@ -2145,5 +2151,20 @@ getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
   }
   return intensity;
 }
+
+/**
+ * Returns the sensor object corresponding to the given sensor name.
+ * @param {string} name The name for the sensor that we want.
+ * @return {object} 
+ */
+getSensorByName = function(name) {
+  var sensor;
+  historian.sensorsInfo.Sensors.forEach(function (sensorObj) {
+    if (sensorObj.Name == name) {
+      sensor = sensorObj;
+    }
+  });
+  return sensor;
+};
 
 });  // goog.scope
