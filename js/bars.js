@@ -1046,7 +1046,7 @@ historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
     var valueMap = entry.value.split(",");
     var errorTag = valueMap[0];
     var eventUID;
-    switch(errorTag) {
+   switch(errorTag) {
       // For error entry, switch on the error tag to get the uid.
       case 'SensorNotActive':
       case 'InvalidActivation':
@@ -1264,7 +1264,8 @@ historian.Bars.prototype.tooltipText_ = function(
           formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
             sensor.MaxRateHz + 'Hz');
         } else {
-          formattedLines.push('Max Delay is 0 second.')
+          formattedLines.push('Min Delay is 0 secon, ' + 
+            'max sampling rate information is not availale.')
         }
       }
     }
