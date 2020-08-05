@@ -125,8 +125,8 @@ historian.Bars = function(context, barData, levelData, timeToDelta, state,
   /** @private {!d3.Drag} */
   this.drag_ = d3.drag()
       .on('start', this.onDragStart_.bind(this))
-      // d3 passes the dragged element via 'this', so we can't bind Bars as it
-      // would override the element reference we need in these 2 functions.
+      // d3 passes the dragged element via 'this', so Bars cannot be binded as 
+      // it would override the element reference needed in these 2 functions.
       .on('drag', this.createOnDragHandler_(this))
       .on('end', this.createDragEndHandler_(this))
       .subject({x: 0, y: 0});
@@ -243,14 +243,14 @@ historian.Bars.prototype.createOnDragHandler_ = function(bars) {
       var yTranslate = 0;
 
       // If the group is between the source and destination rows of the
-      // group being dragged, we need to add a y-translate.
+      // group being dragged, a y-translate is needed.
       if (group.index >= min && group.index <= max) {
         if (d.index == group.index) {
           // This is the group being dragged.
           yTranslate = draggedTranslate;
         } else {
-          // We need to move this group one row in the opposite direction
-          // of the group being dragged.
+          // Move this group one row in the opposite direction of the group 
+          // being dragged.
           yTranslate = bars.getRowHeight_();
           if (draggedTranslate > 0) {
             yTranslate *= -1;
@@ -283,9 +283,9 @@ historian.Bars.prototype.createDragEndHandler_ = function(bars) {
     if (!bars.d3Container_) {
       return;
     }
-    // Snap to the closest row to where we finished dragging.
+    // Snap to the closest row to where the mouse finished dragging.
     var rowsMoved = bars.rowsToMove_(d.index, d3.event.y);
-    // We need to subtract rowsMoved, as a higher index is rendered higher,
+    // Subtract rowsMoved, as a higher index is rendered higher,
     // but that corresponds to a negative y translate and rowsMoved.
     bars.barData_.modifyIndex(d.source, d.name, d.index - rowsMoved);
 
@@ -308,7 +308,7 @@ historian.Bars.prototype.createDragEndHandler_ = function(bars) {
  */
 historian.Bars.prototype.rowsToMove_ = function(originalIndex, yDragged) {
   var rows = Math.round(yDragged / this.getRowHeight_());
-  // A higher index is rendered higher, so we need to subtract the y offset.
+  // A higher index is rendered higher, so subtract the y offset.
   var toIndex = originalIndex - rows;
   // Don't let the user drag beyond the top or bottom rows.
   toIndex = Math.max(0, Math.min(this.barData_.getMaxIndex(), toIndex));
@@ -494,8 +494,8 @@ historian.Bars.prototype.renderLabels_ = function() {
         classes += ' index' + group.index;
         return classes;
       })
-      // Note that labels are outside the translated clip rect.
-      // So we need to add the offset.
+      // Note that labels are outside the translated clip rect. 
+      // Need to add the offset.
       .attr('x', function(group) {
         return group.source == historian.historianV2Logs.Sources.HEADING ?
             historian.Bars.LABEL_HEADING_X_OFFSET_PX_ :
@@ -540,7 +540,7 @@ historian.Bars.prototype.renderLabels_ = function() {
     // Add buttons allowing users to remove individual series. There are some
     // browsers that don't support foreignObject (eg. IE 11 and below), so we
     // have to check that the browser supports it, otherwise, the system will
-    // experience a null error if we try to use this on that browser.
+    // experience a null error if the buttons are used on that browser.
     enterGroups.append('svg:foreignObject')
         .attr('x', historian.Bars.REMOVE_OFFSET_PX_)
         .attr('y', (rowHeight / 2) - (historian.Bars.ROW_LABEL_HEIGHT_PX))
@@ -749,7 +749,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
             }
             return series.color(value);
           // Network connectivity is a special case of aggregated metric.
-          // We want to show the value of greatest duration.
+          // Show the value of greatest duration.
           case historian.metrics.Csv.CONNECTIVITY:
             var split = bar.getMaxValue().split(':');
             return series.color(split[0]);
@@ -757,7 +757,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
           case historian.metrics.Csv.BACKGROUND_COMPILATION:
             // Color based on whether most of the log messages starts with
             // 'Compilation', 'Verification' or some other log line.
-            // We can't use bar.getMaxValue as each log line is counted
+            // Can't use bar.getMaxValue as each log line is counted
             // as a different unique value.
             var typeToCount = {};
             bar.getSortedValues().forEach(function(clusterValue) {
@@ -788,7 +788,7 @@ historian.Bars.prototype.renderSeries_ = function(data) {
           case historian.metrics.Csv.BROADCAST_DISPATCH_BACKGROUND:
             // Since these events are aggregated, a long event might be sliced
             // up into many small parts, which leads to a small max duration
-            // returned by bar.getMaxValue. Instead we get all the original
+            // returned by bar.getMaxValue. Instead, get all the original
             // events and calculate the max duration based on that, so any
             // long broadcast event will have all its sliced up parts colored
             // the right color.
@@ -1011,8 +1011,8 @@ historian.Bars.prototype.filter_ = function(data, callback) {
   var matching = [];
 
   data.forEach(function(d) {
-    // We handle these entries in 2 distinct cases based on the entry type,
-    // as we want the filtered entries to match the original type.
+    // Handle these entries in 2 distinct cases based on the entry type,
+    // as the filtered entries should match the original type.
 
     if (d.services) {
       var filtered = d.services.filter(callback);
@@ -1217,7 +1217,7 @@ historian.Bars.prototype.tooltipText_ = function(
   ];
   var startTime = cluster.startTime;
   // Long wakelock events are modified on the Go side to start a minute earlier
-  // than the recorded event start time. We need to add this extra minute
+  // than the recorded event start time. Need to add this extra minute
   // to get the correct human readable timestamp.
   if (name == historian.metrics.Csv.LONG_WAKELOCK) {
     startTime += 60 * historian.time.MSECS_IN_SEC;
@@ -1295,13 +1295,13 @@ historian.Bars.prototype.tooltipText_ = function(
     }
   } else {
     // Attach a div that the table can be appended to.
-    // The table shouldn't be appended here as we may just want the text
-    // output for copying the tooltip.
+    // The table shouldn't be appended here as only the text output for 
+    // copying the tooltip is needed.
     formattedLines.push('<div id="values-container"></div>');
   }
   if (series.name == historian.metrics.Csv.WAKE_LOCK_HELD) {
     // WAKE_LOCK_HELD only shows the first wakelock, so show a warning.
-    // Clone the array so we don't push a span to the original array each time.
+    // Clone the array to avoid pushing a span to the original array each time.
     var warning = historian.Bars.WAKE_LOCK_WARNING_MSG_HTML_.slice();
     if (toHtml) {
       warning.unshift('<span class="series-warning">');
@@ -1432,17 +1432,18 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
   var bodyRows = [];
   values.forEach(function(entry) {
     var v = entry.value.split(',');
+    var curErrorTag = v[0];
     var uid, packageName, errorMsg;
     // Obtain the uid and package name from the error message, it is possible
-    // that some error message does not contain uid or package name information.
+    // that an error message does not contain uid or package name information.
     var commonErrorTag = ['SensorNotActive', 'Non-existingSensor', 
       'InvalidActivation', 'MultipleActivation', 'MultipleDe-Activation', 
       'MultipleActiveConnection'];
-    if (commonErrorTag.includes(v[0])) {
+    if (commonErrorTag.includes(curErrorTag)) {
       packageName = v[2];
       uid = v[3];
     }
-    switch(v[0]) {
+    switch(curErrorTag) {
       case 'SensorNotActive':
         errorMsg = 'This sensor has an ongoing connection to the listed ' + 
           'uid and package name.';
@@ -1468,8 +1469,7 @@ historian.Bars.prototype.createSensorErrorTable_ = function(values) {
     var singleRow = [v[1], uid, packageName, errorMsg];
     // It is possible that multiple events with the same values are created, 
     // then the entry.count field will record the number of events having this
-    // entry value. We want to show all events even though the values 
-    // are repeated.
+    // entry value. Show all events even though the values are repeated.
     for (var i = 0; i < entry.count; i++) {
       bodyRows.push(singleRow);
     }
@@ -1528,8 +1528,8 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
       isActive = true;
       endTime = "Running";
       durationOutput = "Active Connection";
-      // For active connection, we also show the actual sampling rate and 
-      // batching period information if available.
+      // For active connection, the floating window also shows the actual 
+      // sampling rate and batching period information if available.
       if (headRow.length == 7) {
         headRow.push('Actual Sampling\nRate (Hz)');
         headRow.push('Actual Batching\nPeriod (s)');
@@ -1569,8 +1569,7 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
     }
     // It is possible that multiple events with the same values are created, 
     // then the entry.count field will record the number of events having this
-    // entry value.We want to show all events even though the values 
-    // are repeated.
+    // entry value. Show all events even though the values are repeated.
     for (var i = 0; i < entry.count; i++) {
       bodyRows.push(singleRow);
     }
@@ -1653,7 +1652,7 @@ historian.Bars.prototype.valuesToTable_ = function(series, values, cluster) {
       // Aggregated series may have overlapping entries, which are sliced up
       // into new 'aggregated entries' which are no longer overlapping.
       // This may lead to a long event looking like a series of short events.
-      // Instead we show the original event duration and start time
+      // Instead, show the original event duration and start time
       // (before slicing up) for each sliced up entry.
       var duration = 0;
       var formattedTimes = [];
@@ -1716,8 +1715,7 @@ historian.Bars.prototype.createAMProcTable_ = function(entries) {
   var loc = this.context_.location;
   var bodyRows = entries.map(function(e) {
     var parts = e.value.logLine.split(',');
-    // The start or end time can be unknown, so we display an empty string
-    // instead.
+    // The start or end time can be unknown. Display an empty string instead.
     var start = e.value.startTime == historian.constants.UNKNOWN_TIME ? empty :
         historian.time.getTime(e.value.startTime, loc);
     var end = e.value.endTime == historian.constants.UNKNOWN_TIME ? empty :
@@ -1949,8 +1947,8 @@ historian.Bars.prototype.createSortedTable_ = function(series, cluster) {
  */
 historian.Bars.prototype.createBroadcastsTable_ = function(series, cluster) {
   // The current series either contains all enqueue events, or all dispatch
-  // events. We also want to show details from the corresponding series.
-  // e.g. for enqueue foreground events, we want to show the corresponding
+  // events. Show details from the corresponding series .
+  // e.g. for enqueue foreground events, show the corresponding
   // dispatch foreground events. The enqueue column is always shown first.
   var broadcastMapping = {
     // Active broadcasts are unfinished broadcasts, so have no corresponding
@@ -2011,7 +2009,7 @@ historian.Bars.prototype.createBroadcastsTable_ = function(series, cluster) {
         formattedDur);
   };
 
-  // e.g. If we were given the enqueue background broadcasts, the corresponding
+  // e.g. If the enqueue background broadcasts are given, the corresponding
   // series would contain the dispatch background broadcasts.
   var correspondingSeries = mapping.corresponding ?
       this.barData_.getSeries(mapping.corresponding,
@@ -2024,8 +2022,8 @@ historian.Bars.prototype.createBroadcastsTable_ = function(series, cluster) {
       // screen anyway.
       .filter(function(aggId, idx) { return idx < 100; });
   var bodyRows = originalEntryIds.map(function(aggId) {
-    // Broadcast events may be overlapping and sliced up, but we want
-    // to show the enqueue / dispatch times based on the original entries.
+    // Broadcast events may be overlapping and sliced up, but the 
+    // enqueue / dispatch times based on the original entries will be shown.
     var originalEntry = series.originalValues[aggId];
     var broadcastId = originalEntry.value;
     var tblRow = ['#' + broadcastId, ''];
@@ -2100,7 +2098,7 @@ historian.Bars.prototype.getSeriesTranslate = function(series, idx) {
 
 /**
  * Returns the sensor object corresponding to the given sensor number.
- * @param {number} number The number for the sensor that we want.
+ * @param {number} number The number for the current sensor.
  * @return {object} 
  */
 getSensorByNumber = function(number) {
@@ -2136,11 +2134,18 @@ getColorScale = function(number) {
   return colorScale;
 };
 
+/**	
+ * Returns the intensity of the given sampling rate information	
+ * @param {number} requestMode Request mode of the sensor.
+ * @param {number} curMaxRate The max sampling rate seen in the interval.		
+ * @param {number} sensorMaxRate The max sampling rate set for the sensor.	
+ * @return {object} 	
+ */
 getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
   var intensity = 'low';
-  // The bar is filled with solid color if we are looking at a one-shot
-  // sensor or the curMaxRate == -1 (meaning that sampling period = 0s).
-  if (requestMode == 2 || curMaxRate == -1) {
+  // The bar is filled with solid color if the current sensor is a one-shot
+  // sensor or the sensorMaxRate == -1 (meaning that sampling period = 0s).
+  if (requestMode == 2 || sensorMaxRate == -1) {
     intensity = 'high';
   // Otherwise, set the intensity variable based on the max sampling 
   // rate occurs in the bar.
@@ -2154,7 +2159,7 @@ getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
 
 /**
  * Returns the sensor object corresponding to the given sensor name.
- * @param {string} name The name for the sensor that we want.
+ * @param {string} name The name for the sensor requested.
  * @return {object} 
  */
 getSensorByName = function(name) {
