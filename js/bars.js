@@ -844,8 +844,8 @@ historian.Bars.prototype.renderSeries_ = function(data) {
         }
         var sensor = getSensorByNumber(bar.sensorNum);
         var color = getColorScale(bar.clusteredCount);            
-        var intensity = getSamplingRateIntensity(bar.maxRate, 
-          sensor.RequestMode, sensor.MaxRateHz);
+        var intensity = getSamplingRateIntensity(sensor.RequestMode, 
+          bar.maxRate, sensor.MaxRateHz);
         var fill = 'url("#' + color + '-' + intensity + '-historian-sensor")';
         return fill;
       }
@@ -2155,6 +2155,8 @@ getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
     intensity = 'high';
   } else if (curMaxRate > 0.3 * sensorMaxRate) {
     intensity = 'medium';
+  } else {
+    intensity = 'low';
   }
   return intensity;
 }
