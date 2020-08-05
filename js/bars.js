@@ -1259,8 +1259,12 @@ historian.Bars.prototype.tooltipText_ = function(
         if (sensor.MaxRateHz != -1) {
           var level = getSamplingRateIntensity(sensor.RequestMode, 
             cluster.maxRate, sensor.MaxRateHz);
-          formattedLines.push('Max Sampling Rate in the interval: ' + 
-            cluster.maxRate + 'Hz (' + level + ')');
+          if (cluster.maxRate != -1) {
+            // Only show this message if there is a valid max sampling rate
+            // for this interval.
+            formattedLines.push('Max Sampling Rate in the interval: ' + 
+              cluster.maxRate + 'Hz (' + level + ')');
+          }
           formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
             sensor.MaxRateHz + 'Hz');
         } else {
@@ -2147,7 +2151,9 @@ getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
   var intensity = 'low';
   // The bar is filled with solid color if the current sensor is a one-shot
   // sensor or the sensorMaxRate == -1 (meaning that sampling period = 0s).
-  if (requestMode == 2 || sensorMaxRate == -1) {
+  // Note that if the curMaxRate == -1, meaning that the sampling rate 
+  // information is not availale for this bar, so it is filled with solid color.
+  if (requestMode == 2 || sensorMaxRate == -1 || curMaxRate == -1) {
     intensity = 'high';
   // Otherwise, set the intensity variable based on the max sampling 
   // rate occurs in the bar.
