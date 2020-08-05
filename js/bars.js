@@ -1268,8 +1268,8 @@ historian.Bars.prototype.tooltipText_ = function(
           formattedLines.push('Sensor\'s Max Sampling Rate: ' + 
             sensor.MaxRateHz + 'Hz');
         } else {
-          formattedLines.push('Min Delay is 0 secon, ' + 
-            'max sampling rate information is not availale.')
+          formattedLines.push('Min Delay is 0 second, ' + 
+            'max sampling rate information is not available.')
         }
       }
     }
