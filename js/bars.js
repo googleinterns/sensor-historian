@@ -1044,14 +1044,16 @@ historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
   return this.filter_(data, function(entry) {
     // Only keep the entries that corresponds to the given uid.
     var valueMap = entry.value.split(",");
+    var errorTag = valueMap[0];
     var eventUID;
-    switch(valueMap[0]) {
+    switch(errorTag) {
       // For error entry, the value field starts with an error tag, so we
       // case on the error tag to get the uid.
       case 'SensorNotActive':
       case 'InvalidActivation':
       case 'MultipleActivation':
       case 'MultipleDe-Activation':
+      case 'MultipleActiveConnection':
         eventUID = valueMap[3];
         break
       case 'Non-existingSensor':
