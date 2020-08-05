@@ -1534,6 +1534,9 @@ historian.Bars.prototype.createSensorTable_ = function(values) {
       isActive = true;
       endTime = "Running";
       durationOutput = "Active Connection";
+      if (v[8] == "-1.00") {
+        samplingRate = "Unavailale";
+      }
       // For active connection, the floating window also shows the actual 
       // sampling rate and batching period information if available.
       if (headRow.length == 7) {
