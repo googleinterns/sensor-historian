@@ -249,7 +249,7 @@ historian.Bars.prototype.createOnDragHandler_ = function(bars) {
           // This is the group being dragged.
           yTranslate = draggedTranslate;
         } else {
-          // Move this group one row in the opposite direction of the group 
+          // Move this group one row in the opposite direction of the group
           // being dragged.
           yTranslate = bars.getRowHeight_();
           if (draggedTranslate > 0) {
@@ -837,13 +837,13 @@ historian.Bars.prototype.renderSeries_ = function(data) {
       var showBars = this.container_.find(SHOW_BARS_TOGGLE_).is(':checked');
       // Access the pattern embedded in this svg.
       var hatchPattern = '#' + this.container_.find('svg pattern').attr('id');
-      
+
       var sensorPattern = function(bar) {
         if (series.type == historian.metrics.ERROR_TYPE) {
           return "red";
         }
         var sensor = getSensorByNumber(bar.sensorNum);
-        var color = getColorScale(bar.clusteredCount);            
+        var color = getColorScale(bar.clusteredCount);
         var intensity = getSamplingRateIntensity(sensor.RequestMode, 
           bar.maxRate, sensor.MaxRateHz);
         var fill = 'url("#' + color + '-' + intensity + '-historian-sensor")';
@@ -1047,7 +1047,7 @@ historian.Bars.prototype.filterByAppUid_ = function(data, uid) {
     var errorTag = valueMap[0];
     var eventUID;
    switch(errorTag) {
-      // For error entry, switch on the error tag to get the uid.
+      // For error entry, case on the error tag to get the uid.
       case 'SensorNotActive':
       case 'InvalidActivation':
       case 'MultipleActivation':
@@ -1956,7 +1956,7 @@ historian.Bars.prototype.createSortedTable_ = function(series, cluster) {
  */
 historian.Bars.prototype.createBroadcastsTable_ = function(series, cluster) {
   // The current series either contains all enqueue events, or all dispatch
-  // events. Show details from the corresponding series .
+  // events. Show details from the corresponding series.
   // e.g. for enqueue foreground events, show the corresponding
   // dispatch foreground events. The enqueue column is always shown first.
   var broadcastMapping = {
@@ -2146,9 +2146,9 @@ getColorScale = function(number) {
 /**	
  * Returns the intensity of the given sampling rate information	
  * @param {number} requestMode Request mode of the sensor.
- * @param {number} curMaxRate The max sampling rate seen in the interval.		
+ * @param {number} curMaxRate The max sampling rate seen in the interval.
  * @param {number} sensorMaxRate The max sampling rate set for the sensor.	
- * @return {object} 	
+ * @return {object} 
  */
 getSamplingRateIntensity = function(requestMode, curMaxRate, sensorMaxRate) {
   var intensity = 'low';
