@@ -1474,7 +1474,7 @@ historian.data.ClusterEntry = function(d, forceSingleCount) {
   // This field is for sensor's information only. 
   // It records the max sampling rate seen in the cluster.
   /** @type {number} */
-  this.maxRate = 0;
+  this.maxRate = -1;
 
   /** @type {number} */
   this.activeDuration = 0;
@@ -1509,7 +1509,7 @@ historian.data.ClusterEntry.prototype.add_ = function(d, forceSingleCount) {
   var entries = d.services || [d];
 
   var totalCount = 0;
-  var maxRate = 0;
+  var maxRate = -1;
   var sensorNum = 0;
   entries.forEach(function(entry) {
     var key = historian.data.ClusterEntry.key_(entry);
