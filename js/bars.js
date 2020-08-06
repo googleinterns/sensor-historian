@@ -494,7 +494,7 @@ historian.Bars.prototype.renderLabels_ = function() {
         classes += ' index' + group.index;
         return classes;
       })
-      // Note that labels are outside the translated clip rect. 
+      // Note that labels are outside the translated clip rect.
       // Need to add the offset.
       .attr('x', function(group) {
         return group.source == historian.historianV2Logs.Sources.HEADING ?
@@ -1301,7 +1301,7 @@ historian.Bars.prototype.tooltipText_ = function(
     }
   } else {
     // Attach a div that the table can be appended to.
-    // The table shouldn't be appended here as only the text output for 
+    // The table shouldn't be appended here as only the text output for
     // copying the tooltip is needed.
     formattedLines.push('<div id="values-container"></div>');
   }
