@@ -2143,8 +2143,8 @@ getColorScale = function(number) {
   return colorScale;
 };
 
-/**	
- * Returns the intensity of the given sampling rate information	
+/**
+ * Returns the intensity of the given sampling rate information
  * @param {number} requestMode Request mode of the sensor.
  * @param {number} curMaxRate The max sampling rate seen in the interval.
  * @param {number} sensorMaxRate The max sampling rate set for the sensor.	
