@@ -1858,3 +1858,344 @@ func TestParseSet3(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSet4(t *testing.T) {
+	meta := &bugreportutils.MetaInfo{
+		DeviceID:   `123456789012345678`,
+		SdkVersion: 26,
+		Sensors: map[int32]bugreportutils.SensorInfo{
+			1: {
+				Name:        `BMI160 accelerometer`,
+				Type:        `android.sensor.accelerometer`,
+				Number:      1,
+				RequestMode: 0,
+				MinRateHz:   5.0,
+				MaxRateHz:   200.0,
+			},
+			2: {
+				Name:        `BMI160 accelerometer`,
+				Type:        `android.sensor.accelerometer`,
+				Number:      2,
+				RequestMode: 0,
+				MinRateHz:   5.0,
+				MaxRateHz:   200.0,
+			},
+			7: {
+				Name:        `RPR0521 light`,
+				Type:        `android.sensor.light`,
+				Number:      7,
+				RequestMode: 1,
+				MinRateHz:   0.1,
+				MaxRateHz:   5.0,
+			},
+			4: {
+				Name:        `BMP280 pressure`,
+				Type:        `android.sensor.pressure`,
+				Number:      4,
+				RequestMode: 0,
+				MinRateHz:   1.5,
+				MaxRateHz:   25.0,
+			},
+			24: {
+				Name:        `BMI160 Step counter`,
+				Type:        `android.sensor.step_counter`,
+				Number:      24,
+				RequestMode: 1,
+				MinRateHz:   -1.0,
+				MaxRateHz:   -1.0,
+			},
+			31: {
+				Name:        `Window Orientation`,
+				Type:        `com.google.sensor.window_orientation`,
+				Number:      31,
+				RequestMode: 1,
+				MinRateHz:   0.1,
+				MaxRateHz:   5.0,
+			},
+		},
+	}
+	tests := []struct {
+		name, finput   string
+		wantActiveConn []*sipb.ActiveConn
+		wantDirectConn []*sipb.DirectConn
+		wantSensors    []*sipb.Sensor
+		wantApps       []*sipb.App
+		wantCSV        string
+	}{
+		{
+			name: "[Error for SensorNotActive] " +
+				" Active connection has information for 2 sensors",
+			// Active connection 1 has two sensor subscribing it
+			// Sensor number 1 and 4 both have an active connection with
+			// app (uid 10013), but this sensor is not listed as running.
+			finput: strings.Join([]string{
+				`========================================================`,
+				`== dumpstate: 2015-07-07 18:07:00`,
+				`========================================================`,
+				``,
+				`...`,
+				`Sensor Device:`,
+				`Total 44 h/w sensors, 44 running:`,
+				`0x00000018) active-count = 1; sampling_period(ms) = {250.0}, selected = 250.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`Sensor List:`,
+				`...`,
+				`...`,
+				`2 active connections`,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Connection Number: 1 `,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.location.collectionlib.w | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMP280 pressure 0x00000004 | status: active | pending flush events 0 `,
+				`	 BMI160 accelerometer 0x00000001 | status: active | pending flush events 0 `,
+				`Previous Registrations:`,
+			}, "\n"),
+			wantActiveConn: []*sipb.ActiveConn{
+				{
+					Number:                   1,
+					OperatingMode:            "NORMAL",
+					PackageName:              "com.google.android.gms.fitness.sensors.d.b",
+					UID:                      10013,
+					SensorNumber:             24,
+					PendingFlush:             0,
+					RequestedSamplingRateHz:  -1,
+					RequestedBatchingPeriodS: -1,
+					HasSensorserviceRecord:   false,
+					Source:                   "Sensorservice Dump",
+				},
+				{
+					Number:                   2,
+					OperatingMode:            "NORMAL",
+					PackageName:              "com.google.android.location.collectionlib.w",
+					UID:                      10013,
+					SensorNumber:             4,
+					PendingFlush:             0,
+					RequestedSamplingRateHz:  -1,
+					RequestedBatchingPeriodS: -1,
+					HasSensorserviceRecord:   false,
+					Source:                   "Sensorservice Dump",
+				},
+				{
+					Number:                   3,
+					OperatingMode:            "NORMAL",
+					PackageName:              "com.google.android.location.collectionlib.w",
+					UID:                      10013,
+					SensorNumber:             1,
+					PendingFlush:             0,
+					RequestedSamplingRateHz:  -1,
+					RequestedBatchingPeriodS: -1,
+					HasSensorserviceRecord:   false,
+					Source:                   "Sensorservice Dump",
+				},
+			},
+			wantDirectConn: []*sipb.DirectConn{},
+			wantSensors: []*sipb.Sensor{
+				{
+					Number:    1,
+					Name:      `1.BMI160 accelerometer (accelerometer)`,
+					Type:      `android.sensor.accelerometer`,
+					MaxRateHz: 200,
+					MinRateHz: 5,
+				},
+				{
+					Number:    2,
+					Name:      `2.BMI160 accelerometer (accelerometer)`,
+					Type:      `android.sensor.accelerometer`,
+					MaxRateHz: 200,
+					MinRateHz: 5,
+				},
+				{
+					Number:    4,
+					Name:      `BMP280 pressure`,
+					Type:      `android.sensor.pressure`,
+					MaxRateHz: 25,
+					MinRateHz: 1.5,
+				},
+				{
+					Number:      7,
+					Name:        `RPR0521 light`,
+					Type:        `android.sensor.light`,
+					RequestMode: sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:   5,
+					MinRateHz:   0.1,
+				},
+				{
+					Number:                24,
+					Name:                  `BMI160 Step counter`,
+					Type:                  `android.sensor.step_counter`,
+					RequestMode:           sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:             -1,
+					MinRateHz:             -1,
+					IsActive:              true,
+					ActualSamplingRateHz:  4,
+					ActualBatchingPeriodS: 0,
+				},
+				{
+					Number:      31,
+					Name:        `Window Orientation`,
+					Type:        `com.google.sensor.window_orientation`,
+					RequestMode: sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:   5,
+					MinRateHz:   0.1,
+				},
+			},
+			wantApps: []*sipb.App{
+				{
+					UID: 10013,
+					SensorActivities: []string{
+						"1.BMI160 accelerometer (accelerometer)",
+						"BMP280 pressure",
+						"BMI160 Step counter",
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`BMP280 pressure,error,1436292420000,1436292420000,"SensorNotActive,18:07:00,com.google.android.location.collectionlib.w,10013",`,
+				`1.BMI160 accelerometer (accelerometer),error,1436292420000,1436292420000,"SensorNotActive,18:07:00,com.google.android.location.collectionlib.w,10013",`,
+				`BMI160 Step counter,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`BMP280 pressure,string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,4,CONTINUOUS,10013,com.google.android.location.collectionlib.w,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+				`1.BMI160 accelerometer (accelerometer),string,1436292420000,1436292420000,"18:07:00,1436292420000,18:07:00,1436292420000,1,CONTINUOUS,10013,com.google.android.location.collectionlib.w,-1.00,-1.00,Sensorservice Dump,isActiveConn",`,
+			}, "\n"),
+		},
+		{
+			name: "[Error for MultipleActiveConnection and MulitpleActivation] " +
+				"Two Active connections have the same information",
+			// The two active connections have the same information.
+			// Only one of them is recorded.
+			// One of the activation statement therefore results in a
+			// multiple activation request error.
+			finput: strings.Join([]string{
+				`========================================================`,
+				`== dumpstate: 2015-07-07 18:07:00`,
+				`========================================================`,
+				``,
+				`...`,
+				`Sensor Device:`,
+				`Total 44 h/w sensors, 44 running:`,
+				`0x00000018) active-count = 1; sampling_period(ms) = {250.0}, selected = 250.00 ms; batching_period(ms) = {0.0}, selected = 0.00 ms`,
+				`Sensor List:`,
+				`...`,
+				`...`,
+				`2 active connections`,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Connection Number: 0`,
+				`	Operating Mode: NORMAL`,
+				`	 com.google.android.gms.fitness.sensors.d.b | WakeLockRefCount 0 | uid 10013 | cache size 0 | max cache size 0`,
+				`	 BMI160 Step counter 0x00000018 | status: active | pending flush events 0 `,
+				`Previous Registrations:`,
+				`18:09:20 + 0x00000018 pid= 318 uid= 10013 package=com.google.android.gms.fitness.sensors.d.b samplingPeriod=250000us batchingPeriod=0us`,
+				`18:09:01 + 0x00000018 pid= 318 uid= 10013 package=com.google.android.gms.fitness.sensors.d.b samplingPeriod=250000us batchingPeriod=0us`,
+			}, "\n"),
+			wantActiveConn: []*sipb.ActiveConn{
+				{
+					Number:                   2,
+					OperatingMode:            "NORMAL",
+					PackageName:              "com.google.android.gms.fitness.sensors.d.b",
+					UID:                      10013,
+					SensorNumber:             24,
+					PendingFlush:             0,
+					RequestedSamplingRateHz:  4,
+					RequestedBatchingPeriodS: 0,
+					HasSensorserviceRecord:   true,
+					Source:                   "Sensorservice Dump",
+				},
+			},
+			wantDirectConn: []*sipb.DirectConn{},
+			wantSensors: []*sipb.Sensor{
+				{
+					Number:    1,
+					Name:      `1.BMI160 accelerometer (accelerometer)`,
+					Type:      `android.sensor.accelerometer`,
+					MaxRateHz: 200,
+					MinRateHz: 5,
+				},
+				{
+					Number:    2,
+					Name:      `2.BMI160 accelerometer (accelerometer)`,
+					Type:      `android.sensor.accelerometer`,
+					MaxRateHz: 200,
+					MinRateHz: 5,
+				},
+				{
+					Number:    4,
+					Name:      `BMP280 pressure`,
+					Type:      `android.sensor.pressure`,
+					MaxRateHz: 25,
+					MinRateHz: 1.5,
+				},
+				{
+					Number:      7,
+					Name:        `RPR0521 light`,
+					Type:        `android.sensor.light`,
+					RequestMode: sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:   5,
+					MinRateHz:   0.1,
+				},
+				{
+					Number:                24,
+					Name:                  `BMI160 Step counter`,
+					Type:                  `android.sensor.step_counter`,
+					RequestMode:           sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:             -1,
+					MinRateHz:             -1,
+					IsActive:              true,
+					ActualSamplingRateHz:  4,
+					ActualBatchingPeriodS: 0,
+				},
+				{
+					Number:      31,
+					Name:        `Window Orientation`,
+					Type:        `com.google.sensor.window_orientation`,
+					RequestMode: sipb.RequestMode_ON_CHANGE,
+					MaxRateHz:   5,
+					MinRateHz:   0.1,
+				},
+			},
+			wantApps: []*sipb.App{
+				{
+					UID: 10013,
+					SensorActivities: []string{
+						"BMI160 Step counter",
+					},
+				},
+			},
+			wantCSV: strings.Join([]string{
+				csv.FileHeader,
+				`BMI160 Step counter,string,1436292560000,1436292560000,"18:09:20,1436292560000,18:09:20,1436292560000,24,ON_CHANGE,10013,com.google.android.gms.fitness.sensors.d.b,4.00,0.00,Sensorservice Dump,isActiveConn",`,
+				`BMI160 Step counter,error,1436292541000,1436292541000,"MultipleActivation,18:09:01,com.google.android.gms.fitness.sensors.d.b,10013",`,
+				`BMI160 Step counter,error,1436292560000,1436292560000,"MultipleActiveConnection,18:09:20,com.google.android.gms.fitness.sensors.d.b,10013",`,
+			}, "\n"),
+		},
+	}
+	for _, test := range tests {
+		OutputData := Parse(test.finput, meta)
+		if !reflect.DeepEqual(OutputData.SensorInfo.AllActiveConns, test.wantActiveConn) {
+			t.Errorf("Active connection does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.AllActiveConns, test.wantActiveConn)
+		}
+		if !reflect.DeepEqual(OutputData.SensorInfo.AllDirectConns, test.wantDirectConn) {
+			t.Errorf("Direct connection does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.AllDirectConns, test.wantDirectConn)
+		}
+		if !reflect.DeepEqual(OutputData.SensorInfo.Sensors, test.wantSensors) {
+			t.Errorf("Sensor Information does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.Sensors, test.wantSensors)
+		}
+		if !reflect.DeepEqual(OutputData.SensorInfo.Apps, test.wantApps) {
+			t.Errorf("App Information does not match: %v:\n   got: %v\n  want: %v",
+				test.name, OutputData.SensorInfo.Apps, test.wantApps)
+		}
+		gotCSV := strings.TrimSpace(OutputData.CSV)
+		wantCSV := strings.TrimSpace(test.wantCSV)
+		if !reflect.DeepEqual(gotCSV, wantCSV) {
+			t.Errorf("History does not match: %v:\n  got: %v\n want: %v",
+				test.name, gotCSV, wantCSV)
+		}
+	}
+}
