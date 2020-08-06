@@ -2031,7 +2031,7 @@ historian.Bars.prototype.createBroadcastsTable_ = function(series, cluster) {
       // screen anyway.
       .filter(function(aggId, idx) { return idx < 100; });
   var bodyRows = originalEntryIds.map(function(aggId) {
-    // Broadcast events may be overlapping and sliced up, but the 
+    // Broadcast events may be overlapping and sliced up, but the
     // enqueue / dispatch times based on the original entries will be shown.
     var originalEntry = series.originalValues[aggId];
     var broadcastId = originalEntry.value;
