@@ -88,17 +88,25 @@ upload the `bugreport.txt` file to start analyzing.
 
 ## Screenshots
 
-##### Timeline:
+##### Sensor Historian Tab:
 
-![Timeline](/screenshots/timeline.png "Timeline Visualization")
+![Sensor Historian Tab](/screenshots/Sensor_Historian.png "Sensor Subscription History Visualization")
 
-##### System stats:
+##### Show Legend Items:
 
-![System](/screenshots/system.png "Aggregated System statistics since the device was last fully charged")
+![Show Legend Items](/screenshots/Show_Legend_Items.png "Show the legend items explaining the color scheme and pattern usage.")
 
-##### App stats:
+##### Application Selector:
 
-![App](/screenshots/app.png "Application specific statistics")
+![Application Selector](/screenshots/Application_Selector.png "Use application selector to inspect sensors used by the chosen application.")
+
+##### Sensor Selector:
+
+![Sensor Selector](/screenshots/Sensor_Selector.png "Use sensor selector to inspect a specific set of sensors.")
+
+##### Floating Window:
+
+![Floating Window](/screenshots/Zooming_and_error_message.png "Move the mouse on an event or error to see more information.")
 
 ## Advanced
 
@@ -108,7 +116,7 @@ To reset aggregated battery stats and history:
 adb shell dumpsys batterystats --reset
 ```
 
-##### Wakelock analysis
+##### [For Battery Historian] Wakelock analysis
 
 By default, Android does not record timestamps for application-specific
 userspace wakelock transitions even though aggregate statistics are maintained
@@ -123,7 +131,7 @@ adb shell dumpsys batterystats --enable full-wake-history
 Note that by enabling full wakelock reporting the battery history log overflows
 in a few hours. Use this option for short test runs (3-4 hrs).
 
-##### Kernel trace analysis
+##### [For Battery Historian] Kernel trace analysis
 
 To generate a trace file which logs kernel wakeup source and kernel wakelock
 activities:
@@ -170,7 +178,7 @@ there are different scripts for each device, with the only difference being
 the device-specific dmesg log it tries to find. These scripts have been
 integrated into the Battery Historian tool itself.
 
-##### Power monitor analysis
+##### [For Battery Historian] Power monitor analysis
 
 Lines in power monitor files should have one of the following formats, and the
 format should be consistent throughout the entire file:
@@ -230,7 +238,7 @@ Make your changes to the proto files.
 
 Finally, regenerate the compiled Go proto output files using `regen_proto.sh`.
 
-##### Other command line tools
+##### [For Battery Historian] Other command line tools
 
 ```
 # System stats
