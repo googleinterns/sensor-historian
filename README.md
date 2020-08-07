@@ -1,12 +1,8 @@
-# Sensor Historian
 This is not an officially supported Google product.
 
+# Sensor Historian
 
-All the following information are adopted from the Battery Historian repo. The Sensor Historian tool will have a new README.md file later.
-
-# Battery Historian
-
-Battery Historian is a tool to inspect battery related information and events on an Android device running Android 5.0 Lollipop (API level 21) and later, while the device was not plugged in. It allows application developers to visualize system and application level events on a timeline with panning and zooming functionality, easily see various aggregated statistics since the device was last fully charged, and select an application and inspect the metrics that impact battery specific to the chosen application. It also allows an A/B comparison of two bugreports, highlighting differences in key battery related metrics.
+Sensor Historian is a tool built upon Battery Historian to inspect sensor related information and subscription history on an Android device running Android 8.0 Oreo and later. It allows developers to visualize sensor subscription events and errors on a timeline with panning and zooming functionality, and select an application and inspect the related sensor activities to the chosen application.
 
 ## Getting Started
 
